@@ -124,3 +124,225 @@ async def delete_transaction(tx_id: str, current_user=Depends(get_current_user))
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Transaction not found")
     return {"success": True}
+
+
+@router.get("/ml/anomalies")
+async def detect_anomalies(
+    month: str = Query(default=None),
+    limit: int = Query(default=100),
+    current_user=Depends(get_current_user)
+):
+    """
+    AI/ML-based anomaly detection in transactions
+    Detects unusual spending patterns, potential fraud, and outliers
+    """
+    from anomaly_detector import detect_spending_anomalies
+    
+    db = get_db()
+    user_id = current_user["id"]
+    
+    # Get recent transactions
+    query = {"user_id": user_id, "category_type": "expense"}
+    if month:
+        query["month"] = month
+    
+    cursor = db.transactions.find(query).sort("created_at", -1).limit(limit)
+    transactions = await cursor.to_list(length=limit)
+    
+    if len(transactions) < 10:
+        return {
+            "anomalies": [],
+            "message": "Need at least 10 transactions for anomaly detection",
+            "transaction_count": len(transactions)
+        }
+    
+    # Detect anomalies
+    anomalies = detect_spending_anomalies(serialize_docs(transactions))
+    
+    # Sort by severity
+    severity_order = {'high': 0, 'medium': 1, 'low': 2}
+    anomalies_sorted = sorted(
+        anomalies,
+        key=lambda x: severity_order.get(x.get('severity', 'low'), 3)
+    )
+    
+    return {
+        "anomalies": anomalies_sorted,
+        "total_anomalies": len(anomalies),
+        "high_severity": len([a for a in anomalies if a.get('severity') == 'high']),
+        "medium_severity": len([a for a in anomalies if a.get('severity') == 'medium']),
+        "transactions_analyzed": len(transactions)
+    }
+
+
+@router.get("/ml/insights")
+async def get_ml_insights(
+    month: str = Query(default=None),
+    limit: int = Query(default=100),
+    current_user=Depends(get_current_user)
+):
+    """
+    ML-based spending insights with statistical analysis
+    """
+    from anomaly_detector import get_ml_spending_insights
+    
+    db = get_db()
+    user_id = current_user["id"]
+    
+    # Get recent transactions
+    query = {"user_id": user_id, "category_type": "expense"}
+    if month:
+        query["month"] = month
+    
+    cursor = db.transactions.find(query).sort("created_at", -1).limit(limit)
+    transactions = await cursor.to_list(length=limit)
+    
+    if len(transactions) < 5:
+        return {
+            "error": "Not enough transaction data for insights",
+            "transaction_count": len(transactions)
+        }
+    
+    insights = get_ml_spending_insights(serialize_docs(transactions))
+    
+    return insights
+
+
+
+@router.post("/ml/auto-categorize")
+async def ml_auto_categorize(
+    transaction_id: str,
+    current_user=Depends(get_current_user)
+):
+    """
+    ML-based automatic categorization for a transaction
+    Uses pattern matching and user learning
+    """
+    from ml_categorizer import auto_categorize_transaction
+    
+    db = get_db()
+    user_id = current_user["id"]
+    
+    # Get transaction
+    txn = await db.transactions.find_one({
+        "_id": ObjectId(transaction_id),
+        "user_id": user_id
+    })
+    
+    if not txn:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Auto-categorize using ML
+    result = auto_categorize_transaction(
+        description=txn.get('note', ''),
+        amount=abs(float(txn.get('amount', 0))),
+        user_id=user_id
+    )
+    
+    return {
+        "transaction_id": transaction_id,
+        "suggested_category": result['category'],
+        "confidence": result['confidence'],
+        "alternatives": result['suggestions'],
+        "needs_review": result['needs_review'],
+        "description": txn.get('note', '')
+    }
+
+
+@router.post("/ml/batch-categorize")
+async def ml_batch_categorize(
+    limit: int = Query(default=50),
+    current_user=Depends(get_current_user)
+):
+    """
+    ML-based batch categorization for pending transactions
+    """
+    from ml_categorizer import batch_categorize
+    
+    db = get_db()
+    user_id = current_user["id"]
+    
+    # Get pending transactions
+    cursor = db.transactions.find({
+        "user_id": user_id,
+        "status": "pending"
+    }).sort("created_at", -1).limit(limit)
+    
+    transactions = await cursor.to_list(length=limit)
+    
+    if not transactions:
+        return {
+            "message": "No pending transactions to categorize",
+            "predictions": []
+        }
+    
+    # Batch predict using ML
+    predictions = batch_categorize(serialize_docs(transactions))
+    
+    return {
+        "predictions": predictions,
+        "total_predictions": len(predictions),
+        "high_confidence": len([p for p in predictions if p['confidence'] > 0.7]),
+        "needs_review": len([p for p in predictions if p['confidence'] < 0.6])
+    }
+
+
+@router.get("/ml/forecast")
+async def ml_forecast_expenses(
+    months_ahead: int = Query(default=1, ge=1, le=6),
+    category: str = Query(default=None),
+    current_user=Depends(get_current_user)
+):
+    """
+    ML-based expense forecasting using time series analysis
+    Predicts future expenses based on historical patterns
+    """
+    from ml_forecaster import forecast_expenses, analyze_patterns
+    
+    db = get_db()
+    user_id = current_user["id"]
+    
+    # Get historical data (last 12 months)
+    pipeline = [
+        {"$match": {
+            "user_id": user_id,
+            "category_type": "expense",
+            "status": "categorized"
+        }}
+    ]
+    
+    if category:
+        pipeline[0]["$match"]["expense_category"] = category
+    
+    pipeline.extend([
+        {"$group": {
+            "_id": "$month",
+            "total": {"$sum": "$amount"}
+        }},
+        {"$sort": {"_id": 1}}
+    ])
+    
+    results = await db.transactions.aggregate(pipeline).to_list(length=100)
+    
+    if len(results) < 3:
+        return {
+            "error": "Not enough historical data. Need at least 3 months of transactions.",
+            "data_points": len(results)
+        }
+    
+    # Prepare data
+    historical_data = {r["_id"]: abs(r["total"]) for r in results}
+    
+    # Forecast using ML
+    forecast_result = forecast_expenses(
+        historical_data,
+        category=category or "Total Expenses",
+        months_ahead=months_ahead
+    )
+    
+    # Add pattern analysis
+    if months_ahead == 1:
+        pattern_analysis = analyze_patterns(historical_data)
+        forecast_result['pattern_analysis'] = pattern_analysis
+    
+    return forecast_result

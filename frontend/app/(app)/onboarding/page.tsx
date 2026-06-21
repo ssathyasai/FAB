@@ -89,6 +89,7 @@ export default function OnboardingPage() {
           <p style={{ color: "rgba(240,180,41,0.5)", fontSize: "0.95rem" }}>
             AI-Powered Financial Advisor & Budget Planner
           </p>
+          <p style={{ color: "rgba(255,255,255,0.4)", fontSize: "0.9rem", marginTop: "0.5rem" }}>
             Let's set up your profile in 2 quick steps
           </p>
         </div>
