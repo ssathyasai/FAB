@@ -1,0 +1,50 @@
+# ── Python ───────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+.env
+
+# ── Node / Next.js ───────────────────────────────────────────────
+node_modules/
+.next/
+out/
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tsbuildinfo
+
+# ── Environment files (NEVER commit secrets) ─────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── OS / Editor ──────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.pem
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# ── ML / Data files ──────────────────────────────────────────────
+*.pkl
+*.h5
+*.model
+bank.json
+
+# ── Logs ─────────────────────────────────────────────────────────
+*.log
+logs/
