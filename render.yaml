@@ -1,4 +1,4 @@
-# Render Blueprint — FAB Finance (Backend + Frontend)
+# Render Blueprint — FAB Finance Backend
 services:
   # Backend Service
   - type: web
@@ -33,17 +33,3 @@ services:
         sync: false
       - key: BANK_JSON_PATH
         value: ./bank.json
-
-  # Frontend Service
-  - type: web
-    name: fab-finance-frontend
-    runtime: node
-    plan: free
-    buildCommand: "npm install && npm run build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/"
-    startCommand: "cd .next/standalone && node server.js"
-    rootDir: frontend
-    envVars:
-      - key: NEXT_PUBLIC_BACKEND_URL
-        sync: false
-      - key: PORT
-        value: "3000"
