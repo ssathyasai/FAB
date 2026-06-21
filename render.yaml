@@ -1,5 +1,6 @@
-# Render Blueprint — FAB Finance Backend
+# Render Blueprint — FAB Finance (Backend + Frontend)
 services:
+  # Backend Service
   - type: web
     name: fab-finance-backend
     runtime: python
@@ -11,13 +12,13 @@ services:
       - key: PYTHON_VERSION
         value: 3.10.13
       - key: MONGODB_URI
-        sync: false          # Set manually in Render dashboard
+        sync: false
       - key: DB_NAME
         value: fab_finance
       - key: JWT_SECRET
-        generateValue: true  # Render generates a secure random value
+        generateValue: true
       - key: FRONTEND_URL
-        sync: false          # e.g. https://your-app.vercel.app
+        sync: false
       - key: GROQ_API_KEY
         sync: false
       - key: GEMINI_API_KEY
@@ -31,4 +32,20 @@ services:
       - key: SMTP_EMAIL
         sync: false
       - key: SMTP_PASSWORD
+        sync: false
+      - key: BANK_JSON_PATH
+        value: ./bank.json
+
+  # Frontend Service
+  - type: web
+    name: fab-finance-frontend
+    runtime: node
+    plan: free
+    buildCommand: "npm install && npm run build"
+    startCommand: "npm start"
+    rootDir: frontend
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: NEXT_PUBLIC_BACKEND_URL
         sync: false

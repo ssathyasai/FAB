@@ -7,7 +7,6 @@ import DebtAdvisor from "@/components/advisor/DebtAdvisor";
 import InvestmentAdvisor from "@/components/advisor/InvestmentAdvisor";
 import EmergencyAdvisor from "@/components/advisor/EmergencyAdvisor";
 import LeakDetector from "@/components/advisor/LeakDetector";
-import AdvisorHistory from "@/components/advisor/AdvisorHistory";
 
 const TABS = [
   { id: "insights",    label: "AI Insights",     icon: "fas fa-lightbulb",        col: "#f0b429" },
@@ -17,7 +16,6 @@ const TABS = [
   { id: "investment",  label: "Investment",       icon: "fas fa-chart-line",       col: "#6366f1" },
   { id: "emergency",   label: "Emergency",        icon: "fas fa-first-aid",        col: "#ff6b6b" },
   { id: "leak",        label: "Leak Detector",    icon: "fas fa-faucet",           col: "#fbbf24" },
-  { id: "history",     label: "History",          icon: "fas fa-history",          col: "#8b5cf6" },
 ];
 
 export default function Advisor() {
@@ -84,7 +82,6 @@ export default function Advisor() {
         {tab === "investment" && <InvestmentAdvisor />}
         {tab === "emergency"  && <EmergencyAdvisor />}
         {tab === "leak"       && <LeakDetector />}
-        {tab === "history"    && <AdvisorHistory />}
       </div>
     </div>
   );
