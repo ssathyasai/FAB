@@ -39,7 +39,7 @@ services:
     name: fab-finance-frontend
     runtime: node
     plan: free
-    buildCommand: "npm install && npm run build"
+    buildCommand: "npm install && npm run build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/"
     startCommand: "cd .next/standalone && node server.js"
     rootDir: frontend
     envVars:
