@@ -61,8 +61,8 @@ export default function Sidebar() {
           <i className="fas fa-coins" />
         </div>
         <div>
-          <div className="sidebar-logo-text">FAB<span>Finance</span></div>
-          <div className="sidebar-logo-sub">Personal Finance</div>
+          <div className="sidebar-logo-text">AI<span>FAB</span></div>
+          <div className="sidebar-logo-sub">Financial Advisor & Budget</div>
         </div>
       </Link>
 

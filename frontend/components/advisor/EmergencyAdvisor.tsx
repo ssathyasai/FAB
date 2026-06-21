@@ -3,12 +3,13 @@ import { useState } from "react";
 import { postEmergencyAdvisor } from "@/lib/api";
 
 const EMERGENCY_TYPES = [
-  "Job Loss",
   "Medical Emergency",
-  "Business Loss",
-  "Home Damage",
+  "Job Loss",
   "Accident",
+  "Home Damage",
+  "Business Loss",
   "Family Emergency",
+  "Vehicle Breakdown",
   "Legal Issue"
 ];
 
@@ -43,13 +44,12 @@ export default function EmergencyAdvisor() {
     ];
     
     if (eType === "Medical Emergency") return [
-      ["patient", "Patient (Self/Parent/Spouse/Child)", "text"],
-      ["diagnosis", "Medical Condition", "text"],
-      ["total_cost", "Total Medical Cost (₹)", "number"],
-      ["insurance_covered", "Insurance Will Cover (₹)", "number"],
-      ["urgency", "Urgency (Immediate/1 Week/1 Month)", "text"],
-      ["savings", "Available Savings (₹)", "number"],
-      ["assets", "Assets You Can Sell (Gold/FD/Property value in ₹)", "number"],
+      ["patient", "Patient Relation (Self/Parent/Spouse/Child)", "text"],
+      ["diagnosis", "Medical Condition/Diagnosis", "text"],
+      ["total_cost", "Total Medical Cost Estimate (₹)", "number"],
+      ["insurance_covered", "Amount Insurance Will Cover (₹)", "number"],
+      ["urgency", "When is Money Needed? (Immediate/1 Week/1 Month)", "text"],
+      ["savings", "Available Cash/Savings (₹)", "number"],
     ];
     
     if (eType === "Business Loss") return [
@@ -63,12 +63,12 @@ export default function EmergencyAdvisor() {
     ];
     
     if (eType === "Home Damage") return [
-      ["damage_type", "Damage Type (Fire/Water/Structural)", "text"],
+      ["damage_type", "Type of Damage (Fire/Water/Earthquake/Storm)", "text"],
       ["repair_cost", "Estimated Repair Cost (₹)", "number"],
-      ["insurance_claim", "Insurance Claim Amount (₹)", "number"],
-      ["urgency", "Repair Urgency (Immediate/Can Wait)", "text"],
+      ["insurance_claim", "Insurance Claim Applied For (₹)", "number"],
+      ["urgency", "Repair Urgency (Immediate/Can Wait 1 Month)", "text"],
       ["savings", "Available Savings (₹)", "number"],
-      ["temp_stay_needed", "Need Temporary Accommodation? (Yes/No)", "text"],
+      ["alternate_living", "Need Temporary Stay? (Yes/No)", "text"],
     ];
     
     if (eType === "Accident") return [
@@ -93,6 +93,15 @@ export default function EmergencyAdvisor() {
       ["lawyer_cost", "Lawyer Fees (₹)", "number"],
       ["case_duration", "Case Duration (months)", "number"],
       ["settlement", "Settlement Amount if any (₹)", "number"],
+      ["savings", "Available Savings (₹)", "number"],
+    ];
+    
+    if (eType === "Vehicle Breakdown") return [
+      ["vehicle_type", "Vehicle Type (Car/Bike/Commercial)", "text"],
+      ["issue", "Problem (Engine/Accident/Theft)", "text"],
+      ["repair_cost", "Estimated Repair Cost (₹)", "number"],
+      ["insurance_coverage", "Insurance Will Cover (₹)", "number"],
+      ["need_alternate", "Need Alternative Transport? (Yes/No)", "text"],
       ["savings", "Available Savings (₹)", "number"],
     ];
     

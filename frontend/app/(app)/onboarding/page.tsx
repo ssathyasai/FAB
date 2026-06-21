@@ -35,7 +35,7 @@ export default function OnboardingPage() {
         phone_number: data.phone_number || null,
         onboarding_complete: true,
       });
-      toast.success("Welcome to FAB Finance! 🎉");
+      toast.success("Welcome to AI FAB! 🎉");
       router.push("/budget/setup");
     } catch (err) {
       toast.error("Failed to save. Please try again.");
@@ -84,9 +84,11 @@ export default function OnboardingPage() {
             color: "#f5f0e8",
             marginBottom: "0.5rem"
           }}>
-            Welcome to FAB Finance
+            Welcome to AI FAB
           </h1>
           <p style={{ color: "rgba(240,180,41,0.5)", fontSize: "0.95rem" }}>
+            AI-Powered Financial Advisor & Budget Planner
+          </p>
             Let's set up your profile in 2 quick steps
           </p>
         </div>

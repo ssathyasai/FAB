@@ -128,8 +128,8 @@ export default function LoginPage() {
         <div className="login-logo">
           <i className="fas fa-coins" />
         </div>
-        <h1 className="login-title">FAB Finance</h1>
-        <p className="login-subtitle">AI-powered personal finance tracker</p>
+        <h1 className="login-title">AI FAB</h1>
+        <p className="login-subtitle">AI-Powered Financial Advisor & Budget Planner</p>
         
         <div className="sanskrit-quote">
           <p>"Dhanam mulam idam jagath"</p>

@@ -560,15 +560,17 @@ def _rule_based_investment(req: dict) -> dict:
 
 
 async def get_emergency_recommendations(req: dict) -> dict:
-    if not _has_any_provider():
-        return {"error": "No AI provider configured. Please add GROQ_API_KEY (free) or GEMINI_API_KEY to .env file for emergency advisor to work."}
-    
+    """Emergency recommendations with fallback"""
     emergency_type = req.get('emergency_type', 'Unknown')
     income = req.get('income', 0)
     details = req.get('emergency_details', {})
     
     # Extract savings
     savings = float(details.get('savings', 0))
+    
+    # If no AI provider, use rule-based
+    if not _has_any_provider():
+        return _rule_based_emergency(req)
     
     # Build context
     context_lines = [
@@ -706,4 +708,196 @@ CRITICAL:
         text = await call_ai(prompt, max_tokens=3000)
         return _parse_json(text)
     except Exception as e:
-        return {"error": f"AI service unavailable. {str(e)[:100]}. Please add GROQ_API_KEY to .env for free unlimited access."}
+        # Fallback to rule-based on error
+        return _rule_based_emergency(req)
+
+
+def _rule_based_emergency(req: dict) -> dict:
+    """Rule-based emergency recommendations when AI is unavailable"""
+    emergency_type = req.get('emergency_type', 'Unknown')
+    income = req.get('income', 0)
+    details = req.get('emergency_details', {})
+    savings = float(details.get('savings', 0))
+    
+    # Determine severity
+    monthly_expenses = details.get('monthly_expenses', income * 0.6)
+    if emergency_type in ['Medical Emergency', 'Job Loss']:
+        severity = "Critical"
+    elif emergency_type in ['Home Repair', 'Vehicle Repair']:
+        severity = "High"
+    else:
+        severity = "Moderate"
+    
+    return {
+        "financial_summary": {
+            "income": income,
+            "expenses": monthly_expenses,
+            "savings": savings,
+            "gap": max(0, monthly_expenses - savings)
+        },
+        "situation_assessment": {
+            "severity": severity,
+            "assessment": f"You have ₹{savings:,.0f} in savings. For {emergency_type}, immediate action is needed to arrange funds and minimize financial impact."
+        },
+        "immediate_actions": [
+            "Use available savings for immediate needs",
+            "Contact your bank for emergency loan options",
+            "Check if you have insurance coverage for this emergency",
+            "Cut non-essential expenses immediately",
+            "Inform family members about the situation"
+        ],
+        "funding_sources": [
+            {
+                "source": "Personal Loan",
+                "description": "Quick unsecured loan from banks/NBFCs",
+                "where_to_approach": [
+                    "HDFC Bank - InstaCash (Visit branch or HDFC Mobile App)",
+                    "ICICI Bank - PayLater (ICICI Mobile Banking)",
+                    "MoneyTap App - Download from Play Store",
+                    "Bajaj Finserv App - Personal Loan section",
+                    "Credi Health App - For medical emergencies"
+                ],
+                "timeline": "2-4 days for approval",
+                "interest_rate": "10-15% p.a."
+            },
+            {
+                "source": "Gold Loan",
+                "description": "Instant loan against gold jewelry (75% of gold value)",
+                "where_to_approach": [
+                    "Muthoot Finance - Visit nearest branch with gold",
+                    "Manappuram Finance - Walk-in facility available",
+                    "HDFC Bank Gold Loan Counter",
+                    "Rupeek App - Doorstep gold loan service",
+                    "IIFL Gold Loan - Online application with branch visit"
+                ],
+                "timeline": "Same day - within 30 minutes",
+                "interest_rate": "7-12% p.a."
+            },
+            {
+                "source": "Emergency Credit Card",
+                "description": "Use existing credit card or apply for new one",
+                "where_to_approach": [
+                    "Your existing credit card - Check available limit",
+                    "HDFC Bank Instant Credit Card - Via app",
+                    "OneCard - Apply via OneCard app",
+                    "ICICI Bank Instant Credit Card",
+                    "Axis Bank Instant Credit Card"
+                ],
+                "timeline": "Instant (existing) or 3-7 days (new)",
+                "interest_rate": "18-36% p.a. if unpaid"
+            },
+            {
+                "source": "Salary Advance",
+                "description": "Request advance from employer",
+                "where_to_approach": [
+                    "Contact your HR department",
+                    "Submit written request with emergency details",
+                    "Check company policy on salary advance",
+                    "Usually repaid from next 2-3 salaries"
+                ],
+                "timeline": "1-5 days based on company policy",
+                "interest_rate": "Usually interest-free"
+            }
+        ],
+        "asset_liquidation": [
+            {
+                "asset_type": "Fixed Deposit (FD)",
+                "expected_value": "Full FD amount minus penalty",
+                "how_to_sell": "Break FD online via net banking or visit branch. Penalty: Loss of 1% interest. Get money same day.",
+                "where_to_sell": [
+                    "Your bank's mobile app - FD section → Break FD",
+                    "Net banking - Fixed Deposits tab → Premature withdrawal",
+                    "Visit bank branch with FD receipt and ID",
+                    "Call customer care number for online FD break",
+                    "Money credited to account within hours"
+                ]
+            },
+            {
+                "asset_type": "Gold Jewelry",
+                "expected_value": "₹6,000-6,500 per gram (current rate)",
+                "how_to_sell": "Visit gold buyers with jewelry. Get 3 quotes before selling. Carry purchase bill if available.",
+                "where_to_sell": [
+                    "Tanishq Goldexchange - Buyback at any Tanishq store",
+                    "Muthoot Finance - Gold buying counter at branches",
+                    "Manappuram - Gold purchase service",
+                    "Local trusted jewelry shops - Get competitive quotes",
+                    "PaytmMoney Gold - Online selling (for digital gold only)"
+                ]
+            },
+            {
+                "asset_type": "Mutual Funds",
+                "expected_value": "Current NAV value of units",
+                "how_to_sell": "Redeem units online. Money in 3-4 business days for equity, 1-2 days for debt/liquid funds.",
+                "where_to_sell": [
+                    "Zerodha Coin - Mutual funds section → Redeem",
+                    "Groww App - Holdings → Select fund → Redeem",
+                    "PaytmMoney - Mutual funds → Redeem",
+                    "Fund house website (e.g., HDFC MF, ICICI Prudential MF)",
+                    "Your bank's MF portal - Mutual funds section"
+                ]
+            },
+            {
+                "asset_type": "Stocks/Shares",
+                "expected_value": "Current market price",
+                "how_to_sell": "Sell during market hours (9:15 AM - 3:30 PM). Money in T+2 days (2 working days).",
+                "where_to_sell": [
+                    "Zerodha Kite App - Holdings → Sell",
+                    "Groww Stocks - Portfolio → Sell",
+                    "Upstox App - Holdings section",
+                    "Angel One App - Portfolio → Sell",
+                    "ICICI Direct / HDFC Securities apps"
+                ]
+            },
+            {
+                "asset_type": "PPF/EPF (Partial Withdrawal)",
+                "expected_value": "Up to 50% of balance (if eligible)",
+                "how_to_sell": "Partial withdrawal allowed after 5 years for medical/education/home. Full withdrawal at maturity only.",
+                "where_to_sell": [
+                    "PPF: Visit bank/post office with passbook and withdrawal form",
+                    "EPF: Apply online via EPFO portal - Partial withdrawal",
+                    "Submit necessary documents (medical bills, etc.)",
+                    "Processing takes 7-15 days",
+                    "For emergencies, contact EPFO helpline"
+                ]
+            }
+        ],
+        "recommendations": [
+            "Priority order: Use savings → Break FD/Liquidate investments → Take loan → Sell assets",
+            "Gold loan is better than selling gold - you can reclaim it later",
+            "Compare personal loan interest rates before applying",
+            "For medical emergencies, check government schemes (Ayushman Bharat, state schemes)",
+            "Keep credit card as last resort due to high interest (18-36%)",
+            "Document all expenses for potential insurance claims",
+            "Start rebuilding emergency fund immediately after crisis is resolved"
+        ],
+        "recovery_timeline": {
+            "week_1": [
+                "Use available savings for immediate needs",
+                "Apply for loans/break FD if savings insufficient",
+                "File insurance claims if applicable",
+                "Cut all non-essential expenses",
+                "Inform family and close friends for support"
+            ],
+            "month_1": [
+                "Receive loan disbursement if applied",
+                "Complete emergency-related payments",
+                "Start tracking all expenses strictly",
+                "Create minimal survival budget",
+                "Begin side income if possible (freelance, part-time)"
+            ],
+            "month_3": [
+                "Start loan EMI repayment",
+                "Rebuild emergency fund with 10-20% of income",
+                "Return to normal budget gradually",
+                "Review and update insurance coverage",
+                "Plan long-term financial recovery"
+            ],
+            "month_6": [
+                "Have at least 1-month expenses as emergency fund",
+                "Clear high-interest debt (credit card) if any",
+                "Resume regular savings and investments",
+                "Document lessons learned for future planning"
+            ]
+        },
+        "_note": "AI service unavailable. Using rule-based emergency recommendations. For personalized AI advice, add GROQ_API_KEY (free) or GEMINI_API_KEY to .env file."
+    }

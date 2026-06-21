@@ -94,20 +94,20 @@ async def send_otp_email(email: str, otp: str, name: str = "User"):
         msg = MIMEMultipart()
         msg['From'] = SMTP_EMAIL
         msg['To'] = email
-        msg['Subject'] = "FAB Finance – Email Verification Code"
+        msg['Subject'] = "AI FAB – Email Verification Code"
 
         body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
             <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 FAB Finance</h1>
-                <p style="color: rgba(255,255,255,0.8); margin-top: 8px; font-size:14px;">Your Personal Finance Manager</p>
+                <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 AI FAB</h1>
+                <p style="color: rgba(255,255,255,0.8); margin-top: 8px; font-size:14px;">AI-Powered Financial Advisor & Budget Planner</p>
             </div>
 
             <div style="padding: 32px; background: #ffffff; border-radius: 16px; margin-top: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
                 <h2 style="color: #09090b; margin:0 0 8px;">Hi {name} 👋</h2>
                 <p style="color: #71717a; font-size: 15px; line-height:1.6;">
-                    Welcome to FAB Finance! Please use the code below to verify your email address.
+                    Welcome to AI FAB! Please use the code below to verify your email address.
                     This code is valid for <strong>10 minutes</strong>.
                 </p>
 
@@ -117,11 +117,11 @@ async def send_otp_email(email: str, otp: str, name: str = "User"):
                     <p style="color: #a1a1aa; font-size: 12px; margin-top: 12px;">Do not share this code with anyone</p>
                 </div>
 
-                <p style="color: #a1a1aa; font-size: 13px;">If you didn't create a FAB Finance account, you can safely ignore this email.</p>
+                <p style="color: #a1a1aa; font-size: 13px;">If you didn't create an AI FAB account, you can safely ignore this email.</p>
             </div>
 
             <div style="text-align: center; margin-top: 20px; color: #a1a1aa; font-size: 12px;">
-                <p>© 2026 FAB Finance. All rights reserved.</p>
+                <p>© 2026 AI FAB. All rights reserved.</p>
             </div>
         </body>
         </html>

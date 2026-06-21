@@ -3,8 +3,8 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "FAB Finance — AI Personal Finance Tracker",
-  description: "AI-powered personal finance tracker with budget planning, transaction tracking, and financial advisor",
+  title: "AI FAB — AI-Powered Financial Advisor & Budget Planner",
+  description: "AI-powered financial advisor and budget planner with transaction tracking, investment insights, and personalized recommendations",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
