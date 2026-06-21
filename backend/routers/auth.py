@@ -22,6 +22,25 @@ EXPIRE_DAYS = 30
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
+def hash_password(password: str) -> str:
+    """
+    Hash password with bcrypt.
+    Truncates to 72 bytes to avoid bcrypt limitations.
+    """
+    # Bcrypt has a 72-byte limit, truncate if necessary
+    password_bytes = password.encode('utf-8')[:72]
+    return pwd.hash(password_bytes.decode('utf-8', errors='ignore'))
+
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verify password against hashed password.
+    Truncates to 72 bytes to match hashing behavior.
+    """
+    password_bytes = plain_password.encode('utf-8')[:72]
+    return pwd.verify(password_bytes.decode('utf-8', errors='ignore'), hashed_password)
+
 # Email configuration
 SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
@@ -160,7 +179,7 @@ async def register(req: RegisterRequest):
 
     otp = generate_otp()
     otp_expiry = datetime.utcnow() + timedelta(minutes=10)
-    hashed = pwd.hash(req.password)
+    hashed = hash_password(req.password)
 
     # Upsert pending registration (replace if same email retries)
     await db.pending_registrations.update_one(
@@ -270,7 +289,7 @@ async def login(req: LoginRequest):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     # Verify password first
-    if not user.get("password") or not pwd.verify(req.password, user["password"]):
+    if not user.get("password") or not verify_password(req.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     # Password correct - Generate and store OTP
