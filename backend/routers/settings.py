@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from database import get_db
 from utils import serialize_doc
 from routers.auth import get_current_user
+from models import ChangePasswordRequest
+from passlib.context import CryptContext
 
 router = APIRouter()
+pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 @router.get("/")
@@ -22,6 +25,8 @@ async def get_settings(current_user=Depends(get_current_user)):
         return {
             "income_baseline": 0,
             "income_type": "fixed",
+            "phone_number": "",
+            "theme": "light",
             "gemini_api_key": env_gemini_key if env_gemini_key else "",
             "groq_api_key":   env_groq_key   if env_groq_key   else "",
             "openai_api_key": env_openai_key if env_openai_key else "",
@@ -127,3 +132,29 @@ async def reset_all_data(current_user=Depends(get_current_user)):
             "success": False,
             "message": f"Failed to reset data: {str(e)}"
         }
+
+
+@router.post("/change-password")
+async def change_password(req: ChangePasswordRequest, current_user=Depends(get_current_user)):
+    """Change user password"""
+    from bson import ObjectId
+    db = get_db()
+    user_id = current_user["id"]
+    
+    # Get current user from database
+    user = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Verify current password
+    if not user.get("password") or not pwd.verify(req.current_password, user["password"]):
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    
+    # Hash and update new password
+    new_hashed = pwd.hash(req.new_password)
+    await db.users.update_one(
+        {"_id": ObjectId(user_id)},
+        {"$set": {"password": new_hashed}}
+    )
+    
+    return {"success": True, "message": "Password changed successfully"}

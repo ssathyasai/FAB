@@ -3,11 +3,30 @@ import { useEffect, useState } from "react";
 import { getSettings, updateSettings } from "@/lib/api";
 import { PageHeader } from "@/components/ui";
 import toast from "react-hot-toast";
+import { useRouter } from "next/navigation";
+import axios from "axios";
+
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8000";
 
 export default function Settings() {
-  const [s, setS]       = useState<any>({ name:"",email:"",bank_enabled:true });
+  const router = useRouter();
+  const [s, setS] = useState<any>({ 
+    name: "", 
+    email: "", 
+    phone_number: "",
+    income_baseline: 0,
+    income_type: "fixed",
+    theme: "light",
+    bank_enabled: true 
+  });
+  const [passwords, setPasswords] = useState({
+    current: "",
+    new: "",
+    confirm: ""
+  });
   const [loading, setL] = useState(true);
-  const [saving, setSav]= useState(false);
+  const [saving, setSav] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
   const [resetting, setResetting] = useState(false);
 
   useEffect(() => { 
@@ -18,16 +37,69 @@ export default function Settings() {
       setS((prev: any) => ({ ...prev, name: user.name, email: user.email }));
     }
     // Get settings
-    getSettings().then(r => setS((prev: any) => ({ ...prev, bank_enabled: r.data.bank_enabled }))).finally(() => setL(false)); 
+    getSettings().then(r => {
+      setS((prev: any) => ({ 
+        ...prev, 
+        bank_enabled: r.data.bank_enabled,
+        phone_number: r.data.phone_number || "",
+        income_baseline: r.data.income_baseline || 0,
+        income_type: r.data.income_type || "fixed",
+        theme: r.data.theme || "light"
+      }));
+      // Apply theme
+      document.documentElement.setAttribute("data-theme", r.data.theme || "light");
+    }).finally(() => setL(false)); 
   }, []);
 
   const save = async () => {
     setSav(true);
     try {
-      await updateSettings({ bank_enabled: s.bank_enabled });
+      await updateSettings({ 
+        bank_enabled: s.bank_enabled,
+        phone_number: s.phone_number || null,
+        income_baseline: s.income_baseline,
+        income_type: s.income_type,
+        theme: s.theme
+      });
+      // Apply theme immediately
+      document.documentElement.setAttribute("data-theme", s.theme);
       toast.success("Settings saved");
     } catch { toast.error("Failed to save"); }
     finally { setSav(false); }
+  };
+
+  const changePassword = async () => {
+    if (!passwords.current || !passwords.new) {
+      toast.error("Please fill all password fields");
+      return;
+    }
+    if (passwords.new.length < 6) {
+      toast.error("New password must be at least 6 characters");
+      return;
+    }
+    if (passwords.new !== passwords.confirm) {
+      toast.error("New passwords don't match");
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const token = localStorage.getItem("fab_token");
+      await axios.post(
+        `${API_URL}/api/settings/change-password`,
+        {
+          current_password: passwords.current,
+          new_password: passwords.new
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success("Password changed successfully!");
+      setPasswords({ current: "", new: "", confirm: "" });
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || "Failed to change password");
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   const resetAllData = async () => {
@@ -61,12 +133,14 @@ export default function Settings() {
 
     setResetting(true);
     try {
-      const response = await fetch("http://localhost:8000/api/settings/reset-all-data", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
+      const token = localStorage.getItem("fab_token");
+      const response = await axios.post(
+        `${API_URL}/api/settings/reset-all-data`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       
-      const result = await response.json();
+      const result = response.data;
       
       if (result.success) {
         toast.success("🎉 All data has been reset! Redirecting to login...");
@@ -124,9 +198,169 @@ export default function Settings() {
                 style={{ background:"var(--surface2)",cursor:"not-allowed" }}
               />
             </div>
-            <div style={{ fontSize:"0.75rem",color:"var(--text4)",marginTop:"-0.5rem" }}>
-              <i className="fas fa-info-circle" /> Personal details cannot be changed after registration
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label>Phone Number</label>
+              <input 
+                className="input-field" 
+                type="tel" 
+                value={s.phone_number}
+                onChange={e => setS((x: any) => ({ ...x, phone_number: e.target.value }))}
+                placeholder="+91 98765 43210"
+              />
             </div>
+          </div>
+        </div>
+
+        {/* Theme Settings */}
+        <div className="card" style={{ padding:"1.5rem 1.75rem" }}>
+          <div className="section-title"><i className="fas fa-palette" />Appearance</div>
+          <p style={{ color:"var(--text3)",fontSize:"0.85rem",lineHeight:1.6,marginBottom:"1.2rem" }}>
+            Choose your preferred theme
+          </p>
+          <div style={{ display:"flex",gap:"0.75rem" }}>
+            {["light", "dark"].map(theme => (
+              <button
+                key={theme}
+                type="button"
+                onClick={() => {
+                  setS((x: any) => ({ ...x, theme }));
+                  document.documentElement.setAttribute("data-theme", theme);
+                }}
+                style={{
+                  flex:1,
+                  padding:"1rem",
+                  borderRadius:"10px",
+                  border:`2px solid ${s.theme === theme ? "var(--accent)" : "var(--border)"}`,
+                  background: s.theme === theme ? "var(--accent-dim)" : "var(--surface2)",
+                  color: s.theme === theme ? "var(--accent)" : "var(--text2)",
+                  fontSize:"0.9rem",
+                  fontWeight:600,
+                  cursor:"pointer",
+                  textTransform:"capitalize",
+                  transition:"all 0.2s",
+                  display:"flex",
+                  flexDirection:"column",
+                  alignItems:"center",
+                  gap:"0.5rem"
+                }}
+              >
+                <i className={theme === "light" ? "fas fa-sun" : "fas fa-moon"} style={{ fontSize:"1.5rem" }} />
+                {theme}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Budget Setup */}
+        <div className="card" style={{ padding:"1.5rem 1.75rem" }}>
+          <div className="section-title"><i className="fas fa-wallet" />Budget Setup</div>
+          <p style={{ color:"var(--text3)",fontSize:"0.85rem",lineHeight:1.6,marginBottom:"1.2rem" }}>
+            Configure your income and budget preferences
+          </p>
+          <div style={{ display:"flex",flexDirection:"column",gap:"1rem" }}>
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label>Monthly Income</label>
+              <div style={{ position:"relative" }}>
+                <span style={{
+                  position:"absolute",
+                  left:"1rem",
+                  top:"50%",
+                  transform:"translateY(-50%)",
+                  color:"var(--text3)",
+                  fontWeight:600
+                }}>₹</span>
+                <input 
+                  className="input-field" 
+                  type="number" 
+                  value={s.income_baseline}
+                  onChange={e => setS((x: any) => ({ ...x, income_baseline: parseFloat(e.target.value) || 0 }))}
+                  placeholder="50000"
+                  style={{ paddingLeft:"2.5rem" }}
+                />
+              </div>
+            </div>
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label>Income Type</label>
+              <div style={{ display:"flex",gap:"0.5rem" }}>
+                {["fixed", "variable"].map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => setS((x: any) => ({ ...x, income_type: type }))}
+                    style={{
+                      flex:1,
+                      padding:"0.7rem",
+                      borderRadius:"8px",
+                      border:`2px solid ${s.income_type === type ? "var(--accent)" : "var(--border)"}`,
+                      background: s.income_type === type ? "var(--accent-bg)" : "var(--surface2)",
+                      color: s.income_type === type ? "var(--accent)" : "var(--text2)",
+                      fontSize:"0.85rem",
+                      fontWeight:600,
+                      cursor:"pointer",
+                      textTransform:"capitalize",
+                      transition:"all 0.2s"
+                    }}
+                  >
+                    {type}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button 
+              onClick={() => router.push("/budget/setup")}
+              className="btn btn-secondary"
+              style={{ width:"100%",marginTop:"0.5rem" }}
+            >
+              <i className="fas fa-magic" /> Run Budget Setup Wizard
+            </button>
+          </div>
+        </div>
+
+        {/* Change Password */}
+        <div className="card" style={{ padding:"1.5rem 1.75rem" }}>
+          <div className="section-title"><i className="fas fa-key" />Change Password</div>
+          <p style={{ color:"var(--text3)",fontSize:"0.85rem",lineHeight:1.6,marginBottom:"1.2rem" }}>
+            Update your account password
+          </p>
+          <div style={{ display:"flex",flexDirection:"column",gap:"1rem" }}>
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label>Current Password</label>
+              <input 
+                className="input-field" 
+                type="password" 
+                value={passwords.current}
+                onChange={e => setPasswords(p => ({ ...p, current: e.target.value }))}
+                placeholder="Enter current password"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label>New Password</label>
+              <input 
+                className="input-field" 
+                type="password" 
+                value={passwords.new}
+                onChange={e => setPasswords(p => ({ ...p, new: e.target.value }))}
+                placeholder="Min 6 characters"
+              />
+            </div>
+            <div className="form-group" style={{ marginBottom:0 }}>
+              <label>Confirm New Password</label>
+              <input 
+                className="input-field" 
+                type="password" 
+                value={passwords.confirm}
+                onChange={e => setPasswords(p => ({ ...p, confirm: e.target.value }))}
+                placeholder="Repeat new password"
+              />
+            </div>
+            <button 
+              onClick={changePassword}
+              disabled={changingPassword}
+              className="btn btn-secondary"
+              style={{ width:"100%" }}
+            >
+              {changingPassword ? "Changing..." : <><i className="fas fa-check" /> Change Password</>}
+            </button>
           </div>
         </div>
 
@@ -215,18 +449,6 @@ export default function Settings() {
               alignItems: "center",
               justifyContent: "center",
               gap: "0.5rem",
-            }}
-            onMouseEnter={(e) => {
-              if (!resetting) {
-                e.currentTarget.style.background = "rgba(239,68,68,0.20)";
-                e.currentTarget.style.transform = "translateY(-1px)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              if (!resetting) {
-                e.currentTarget.style.background = "rgba(239,68,68,0.12)";
-                e.currentTarget.style.transform = "translateY(0)";
-              }
             }}
           >
             {resetting ? (

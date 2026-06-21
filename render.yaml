@@ -14,12 +14,6 @@ services:
         value: fab_finance
       - key: JWT_SECRET
         generateValue: true  # Render generates a secure random value
-      - key: GOOGLE_CLIENT_ID
-        sync: false
-      - key: GOOGLE_CLIENT_SECRET
-        sync: false
-      - key: GOOGLE_REDIRECT_URI
-        sync: false          # e.g. https://your-app.vercel.app/api/auth/google/callback
       - key: FRONTEND_URL
         sync: false          # e.g. https://your-app.vercel.app
       - key: GROQ_API_KEY

@@ -12,7 +12,6 @@ import string
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import httpx
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
@@ -29,10 +28,7 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 
-# Google OAuth configuration
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:3000/api/auth/google/callback")
+
 
 
 # ─── Request Models ──────────────────────────────────────────────
@@ -55,10 +51,6 @@ class ResendOTPRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str
-
-
-class GoogleAuthRequest(BaseModel):
-    code: str
 
 
 # ─── Helpers ─────────────────────────────────────────────────────
@@ -266,145 +258,106 @@ async def resend_otp(req: ResendOTPRequest):
     return {"status": "otp_sent", "message": "New verification code sent to your email"}
 
 
-@router.post("/google")
-async def google_auth(req: GoogleAuthRequest):
-    """
-    Exchange a Google OAuth2 authorization code for a FAB Finance JWT.
-    Creates a new user if first time, or logs in the existing Google user.
-    """
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info(f"[Google OAuth] Starting authentication process")
-    
-    if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
-        raise HTTPException(
-            status_code=503,
-            detail="Google OAuth is not configured on this server. Add GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET to backend/.env"
-        )
-
-    async with httpx.AsyncClient() as client:
-        # Step 1: Exchange auth code for tokens
-        logger.info(f"[Google OAuth] Exchanging authorization code...")
-        token_response = await client.post(
-            "https://oauth2.googleapis.com/token",
-            data={
-                "code": req.code,
-                "client_id": GOOGLE_CLIENT_ID,
-                "client_secret": GOOGLE_CLIENT_SECRET,
-                "redirect_uri": GOOGLE_REDIRECT_URI,
-                "grant_type": "authorization_code",
-            },
-        )
-
-        if token_response.status_code != 200:
-            logger.error(f"[Google OAuth] Token exchange failed: {token_response.text}")
-            raise HTTPException(status_code=400, detail="Failed to exchange Google authorization code")
-
-        token_data = token_response.json()
-        access_token = token_data.get("access_token")
-
-        if not access_token:
-            raise HTTPException(status_code=400, detail="No access token received from Google")
-
-        logger.info(f"[Google OAuth] Access token received, fetching user info...")
-        
-        # Step 2: Fetch user info from Google
-        userinfo_response = await client.get(
-            "https://www.googleapis.com/oauth2/v2/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-
-        if userinfo_response.status_code != 200:
-            logger.error(f"[Google OAuth] Failed to fetch user info: {userinfo_response.text}")
-            raise HTTPException(status_code=400, detail="Failed to fetch user info from Google")
-
-        google_user = userinfo_response.json()
-
-    google_id = google_user.get("id")
-    email = google_user.get("email", "").lower()
-    name = google_user.get("name", email.split("@")[0])
-    picture = google_user.get("picture", "")
-
-    logger.info(f"[Google OAuth] User info received: {email}, ID: {google_id}")
-
-    if not email or not google_id:
-        raise HTTPException(status_code=400, detail="Could not get user info from Google")
-
-    db = get_db()
-
-    # Step 3: Upsert user — find by google_id first, then by email
-    logger.info(f"[Google OAuth] Looking for existing user with google_id: {google_id}")
-    user = await db.users.find_one({"google_id": google_id})
-    
-    if not user:
-        logger.info(f"[Google OAuth] No user with google_id, checking email: {email}")
-        user = await db.users.find_one({"email": email})
-
-    if user:
-        # Existing user — update Google info
-        logger.info(f"[Google OAuth] Found existing user, updating Google info")
-        from bson import ObjectId
-        await db.users.update_one(
-            {"_id": user["_id"]},
-            {"$set": {
-                "google_id": google_id,
-                "picture": picture,
-                "name": name,
-                "email_verified": True,
-            }},
-        )
-        user_id = str(user["_id"])
-        user_name = name
-        logger.info(f"[Google OAuth] User updated: {user_id}")
-    else:
-        # New user via Google — create account (no password, email pre-verified)
-        logger.info(f"[Google OAuth] Creating new user for {email}")
-        doc = {
-            "name": name,
-            "email": email,
-            "google_id": google_id,
-            "picture": picture,
-            "password": None,
-            "email_verified": True,
-            "created_at": datetime.utcnow(),
-        }
-        result = await db.users.insert_one(doc)
-        user_id = str(result.inserted_id)
-        user_name = name
-        logger.info(f"[Google OAuth] New user created: {user_id}")
-
-    token = make_token(user_id)
-    logger.info(f"[Google OAuth] JWT token generated for user: {user_id}")
-    
-    return {
-        "token": token,
-        "user": {"id": user_id, "name": user_name, "email": email, "picture": picture},
-    }
-
-
 @router.post("/login")
 async def login(req: LoginRequest):
+    """
+    Step 1 of login: Verify password and send OTP to user's email
+    Returns {status: "otp_sent"}
+    """
     db = get_db()
     user = await db.users.find_one({"email": req.email.lower().strip()})
     if not user:
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    # Google-only accounts have no password
-    if not user.get("password"):
-        raise HTTPException(
-            status_code=401,
-            detail="This account uses Google Sign-In. Please click 'Continue with Google'."
-        )
-
-    if not pwd.verify(req.password, user["password"]):
+    # Verify password first
+    if not user.get("password") or not pwd.verify(req.password, user["password"]):
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
+    # Password correct - Generate and store OTP
+    otp = generate_otp()
+    otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store OTP in login_otps collection
+    await db.login_otps.update_one(
+        {"email": req.email.lower()},
+        {
+            "$set": {
+                "email": req.email.lower().strip(),
+                "otp": otp,
+                "otp_expiry": otp_expiry,
+                "created_at": datetime.utcnow(),
+            }
+        },
+        upsert=True,
+    )
+    
+    # Send OTP email
+    await send_otp_email(req.email, otp, user.get("name", "User"))
+    
+    return {"status": "otp_sent", "message": "Verification code sent to your email"}
+
+
+@router.post("/login-verify")
+async def login_verify(req: VerifyOTPRequest):
+    """
+    Step 2 of login: Verify OTP and return JWT token
+    """
+    db = get_db()
+    
+    # Check OTP
+    login_otp = await db.login_otps.find_one({"email": req.email.lower()})
+    if not login_otp:
+        raise HTTPException(
+            status_code=404,
+            detail="No OTP found. Please request a new one."
+        )
+    
+    if datetime.utcnow() > login_otp["otp_expiry"]:
+        await db.login_otps.delete_one({"email": req.email.lower()})
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    
+    if login_otp["otp"] != req.otp.strip():
+        raise HTTPException(status_code=400, detail="Invalid OTP. Please check your email.")
+    
+    # OTP is valid - get user
+    user = await db.users.find_one({"email": req.email.lower()})
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
+    
+    # Clean up OTP
+    await db.login_otps.delete_one({"email": req.email.lower()})
+    
     user_id = str(user["_id"])
     token = make_token(user_id)
     return {
         "token": token,
         "user": {"id": user_id, "name": user["name"], "email": user["email"]},
     }
+
+
+@router.post("/login-resend")
+async def login_resend(req: ResendOTPRequest):
+    """Resend login OTP"""
+    db = get_db()
+    
+    # Verify user exists
+    user = await db.users.find_one({"email": req.email.lower()})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Generate new OTP
+    otp = generate_otp()
+    otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    await db.login_otps.update_one(
+        {"email": req.email.lower()},
+        {"$set": {"otp": otp, "otp_expiry": otp_expiry}},
+        upsert=True,
+    )
+    
+    await send_otp_email(req.email, otp, user.get("name", "User"))
+    
+    return {"status": "otp_sent", "message": "New verification code sent to your email"}
 
 
 @router.get("/me")

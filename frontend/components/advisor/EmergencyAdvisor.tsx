@@ -100,9 +100,10 @@ export default function EmergencyAdvisor() {
   };
 
   return (
-    <div style={{ display: "flex", gap: "1.5rem", height: "calc(100vh - 120px)" }}>
-      {/* Left Panel */}
-      <div style={{ width: "380px", display: "flex", flexDirection: "column" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+      <div style={{ display: "flex", gap: "1.5rem", height: "calc(100vh - 120px)" }}>
+        {/* Left Panel */}
+        <div style={{ width: "380px", display: "flex", flexDirection: "column" }}>
         <div className="card" style={{ padding: "1.5rem", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <h3 style={{ fontWeight: 700, marginBottom: "1rem", fontSize: "1.1rem" }}>🆘 Emergency Advisor</h3>
           
@@ -408,6 +409,7 @@ export default function EmergencyAdvisor() {
           )}
         </div>
       )}
+      </div>
     </div>
   );
 }

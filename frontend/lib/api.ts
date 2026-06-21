@@ -16,7 +16,6 @@ api.interceptors.request.use((config) => {
 export const register   = (data: object) => api.post("/api/auth/register", data);
 export const verifyOTP  = (data: object) => api.post("/api/auth/verify-otp", data);
 export const resendOTP  = (data: object) => api.post("/api/auth/resend-otp", data);
-export const googleAuth = (code: string) => api.post("/api/auth/google", { code });
 export const login      = (data: object) => api.post("/api/auth/login", data);
 export const getMe      = ()             => api.get("/api/auth/me");
 

@@ -34,6 +34,32 @@
   --shadow-lg:   0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -4px rgba(0,0,0,0.05);
 }
 
+[data-theme="dark"] {
+  --bg:          #0a0e1a;
+  --bg-sidebar:  #111827;
+  --surface:     #1f2937;
+  --surface2:    #374151;
+  --border:      #4b5563;
+  --border2:     #6b7280;
+  --accent:      #818cf8;
+  --accent-hover:#6366f1;
+  --accent-dim:  #312e81;
+  --accent2:     #a78bfa;
+  --green:       #10b981;
+  --green-dim:   #064e3b;
+  --red:         #ef4444;
+  --red-dim:     #7f1d1d;
+  --amber:       #f59e0b;
+  --cyan:        #06b6d4;
+  --text1:       #f9fafb;
+  --text2:       #e5e7eb;
+  --text3:       #d1d5db;
+  --text4:       #9ca3af;
+  --shadow-sm:   0 1px 2px rgba(0,0,0,0.3);
+  --shadow-md:   0 4px 6px -1px rgba(0,0,0,0.3), 0 2px 4px -2px rgba(0,0,0,0.2);
+  --shadow-lg:   0 10px 15px -3px rgba(0,0,0,0.4), 0 4px 6px -4px rgba(0,0,0,0.3);
+}
+
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
 html { scroll-behavior: smooth; }
@@ -612,7 +638,23 @@ body {
   align-items: center;
   justify-content: center;
   padding: 1.5rem;
-  background: var(--bg);
+  background-image: url('/money-rain.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-attachment: fixed;
+  position: relative;
+}
+
+.login-page::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(255, 255, 255, 0.5);
+  z-index: 0;
 }
 
 .login-card {
@@ -622,7 +664,9 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-xl);
   padding: 2.5rem 2rem;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15);
+  position: relative;
+  z-index: 1;
 }
 
 .login-logo {
@@ -723,28 +767,7 @@ body {
   background: var(--border);
 }
 
-.google-btn {
-  width: 100%;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  padding: 0.7rem;
-  font-family: inherit;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text1);
-  cursor: pointer;
-  transition: all 0.15s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-}
 
-.google-btn:hover {
-  background: var(--surface2);
-  border-color: var(--border2);
-}
 
 .pass-wrap { position: relative; }
 

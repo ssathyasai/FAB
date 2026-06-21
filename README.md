@@ -63,13 +63,12 @@ npm run dev
 | `MONGODB_URI` | Your Atlas connection string |
 | `DB_NAME` | `fab_finance` |
 | `JWT_SECRET` | A strong random string |
-| `GOOGLE_CLIENT_ID` | From Google Cloud Console |
-| `GOOGLE_CLIENT_SECRET` | From Google Cloud Console |
-| `GOOGLE_REDIRECT_URI` | `https://YOUR_VERCEL_APP.vercel.app/api/auth/google/callback` |
-| `FRONTEND_URL` | `https://YOUR_VERCEL_APP.vercel.app` |
 | `GROQ_API_KEY` | Your Groq API key |
+| `SMTP_SERVER` | `smtp.gmail.com` |
+| `SMTP_PORT` | `587` |
 | `SMTP_EMAIL` | Your Gmail address |
 | `SMTP_PASSWORD` | Your Gmail App Password |
+| `FRONTEND_URL` | `https://YOUR_VERCEL_APP.vercel.app` |
 
 6. Note your Render URL: `https://fab-finance-backend.onrender.com`
 
@@ -79,24 +78,17 @@ npm run dev
 3. Settings:
    - **Root Directory**: `frontend`
    - **Framework**: Next.js (auto-detected)
-4. Add these **Environment Variables** in Vercel dashboard:
+4. Add this **Environment Variable** in Vercel dashboard:
 
 | Variable | Value |
 |---|---|
 | `NEXT_PUBLIC_BACKEND_URL` | `https://fab-finance-backend.onrender.com` |
-| `NEXT_PUBLIC_GOOGLE_CLIENT_ID` | From Google Cloud Console |
 
 5. Deploy! Note your Vercel URL: `https://your-app.vercel.app`
 
 ### Step 4 — Update Render env vars
 Go back to Render and update:
-- `GOOGLE_REDIRECT_URI` → `https://your-app.vercel.app/api/auth/google/callback`
 - `FRONTEND_URL` → `https://your-app.vercel.app`
-
-### Step 5 — Update Google Cloud Console
-In [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials → your OAuth Client:
-- Add to **Authorized redirect URIs**: `https://your-app.vercel.app/api/auth/google/callback`
-- Add to **Authorized JavaScript origins**: `https://your-app.vercel.app`
 
 ---
 
@@ -105,4 +97,4 @@ In [Google Cloud Console](https://console.cloud.google.com) → APIs & Services 
 - **Backend**: FastAPI, Python, Motor (async MongoDB)
 - **Database**: MongoDB Atlas
 - **AI**: Groq (LLaMA), Google Gemini, OpenAI (with fallback)
-- **Auth**: JWT + Google OAuth2
+- **Auth**: JWT + OTP Email Verification

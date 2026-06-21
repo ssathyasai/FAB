@@ -108,8 +108,15 @@ class Alert(BaseModel):
 class UserSettings(BaseModel):
     income_baseline: float = 0.0
     income_type: str = "fixed"  # fixed / variable
+    phone_number: Optional[str] = None
+    theme: str = "light"  # light / dark
     gemini_api_key: Optional[str] = None
     onboarding_complete: bool = False
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
 
 
 # ─── AI Advisor Models ────────────────────────────────────────────

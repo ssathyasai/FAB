@@ -93,17 +93,6 @@ async def savings_advisor(req: SavingAdvisorRequest, current_user=Depends(get_cu
     data["expenses"] = expenses
     
     result = await get_saving_recommendations(data)
-    
-    # Store in history
-    history_doc = {
-        "user_id": user_id,
-        "advisor_type": "savings",
-        "request_data": data,
-        "response_data": result,
-        "created_at": datetime.utcnow()
-    }
-    await db.advisor_history.insert_one(history_doc)
-    
     return result
 
 
@@ -133,17 +122,6 @@ async def debt_advisor(req: DebtAdvisorRequest, current_user=Depends(get_current
     logger.info(f"[DEBT ADVISOR] Sending to AI - Income: ₹{income:,}, Loans: {len(data.get('loans', []))}")
     
     result = await get_debt_recommendations(data)
-    
-    # Store in history
-    history_doc = {
-        "user_id": user_id,
-        "advisor_type": "debt",
-        "request_data": data,
-        "response_data": result,
-        "created_at": datetime.utcnow()
-    }
-    await db.advisor_history.insert_one(history_doc)
-    
     return result
 
 
@@ -154,17 +132,6 @@ async def investment_advisor(req: InvestmentAdvisorRequest, current_user=Depends
     
     data = req.dict()
     result = await get_investment_recommendations(data)
-    
-    # Store in history
-    history_doc = {
-        "user_id": user_id,
-        "advisor_type": "investment",
-        "request_data": data,
-        "response_data": result,
-        "created_at": datetime.utcnow()
-    }
-    await db.advisor_history.insert_one(history_doc)
-    
     return result
 
 
@@ -210,17 +177,6 @@ async def emergency_advisor(req: EmergencyAdvisorRequest, current_user=Depends(g
     logger.info(f"[EMERGENCY ADVISOR] Emergency Type: {data.get('emergency_type')}")
     
     result = await get_emergency_recommendations(data)
-    
-    # Store in history
-    history_doc = {
-        "user_id": user_id,
-        "advisor_type": "emergency",
-        "request_data": data,
-        "response_data": result,
-        "created_at": datetime.utcnow()
-    }
-    await db.advisor_history.insert_one(history_doc)
-    
     return result
 
 
@@ -285,84 +241,3 @@ async def what_if_analysis(
         "warning": new_savings_rate < 10,
     }
 
-
-# ============ ADVISOR HISTORY ENDPOINTS ============
-
-@router.get("/history")
-async def get_advisor_history(
-    advisor_type: str = Query(default=None, description="Filter by advisor type: debt, savings, investment, emergency"),
-    limit: int = Query(default=20, ge=1, le=100),
-    current_user=Depends(get_current_user)
-):
-    """Get advisor request history for the current user"""
-    db = get_db()
-    user_id = current_user["id"]
-    
-    query = {"user_id": user_id}
-    if advisor_type:
-        query["advisor_type"] = advisor_type
-    
-    history = await db.advisor_history.find(query).sort("created_at", -1).limit(limit).to_list(limit)
-    
-    return {
-        "history": serialize_docs(history),
-        "total": len(history)
-    }
-
-
-@router.get("/history/{history_id}")
-async def get_advisor_history_item(history_id: str, current_user=Depends(get_current_user)):
-    """Get a specific advisor history item by ID"""
-    from bson import ObjectId
-    db = get_db()
-    user_id = current_user["id"]
-    
-    history_item = await db.advisor_history.find_one({
-        "_id": ObjectId(history_id),
-        "user_id": user_id
-    })
-    
-    if not history_item:
-        raise HTTPException(status_code=404, detail="History item not found")
-    
-    return serialize_doc(history_item)
-
-
-@router.delete("/history/{history_id}")
-async def delete_advisor_history_item(history_id: str, current_user=Depends(get_current_user)):
-    """Delete a specific advisor history item"""
-    from bson import ObjectId
-    db = get_db()
-    user_id = current_user["id"]
-    
-    result = await db.advisor_history.delete_one({
-        "_id": ObjectId(history_id),
-        "user_id": user_id
-    })
-    
-    if result.deleted_count == 0:
-        raise HTTPException(status_code=404, detail="History item not found")
-    
-    return {"success": True, "message": "History item deleted"}
-
-
-@router.delete("/history")
-async def clear_advisor_history(
-    advisor_type: str = Query(default=None, description="Clear only specific type, or all if not specified"),
-    current_user=Depends(get_current_user)
-):
-    """Clear advisor history for the current user"""
-    db = get_db()
-    user_id = current_user["id"]
-    
-    query = {"user_id": user_id}
-    if advisor_type:
-        query["advisor_type"] = advisor_type
-    
-    result = await db.advisor_history.delete_many(query)
-    
-    return {
-        "success": True,
-        "message": f"Deleted {result.deleted_count} history items",
-        "deleted_count": result.deleted_count
-    }

@@ -1,7 +1,6 @@
 "use client";
 import { useState } from "react";
 import AIInsights from "@/components/advisor/AIInsights";
-import WhatIf from "@/components/advisor/WhatIf";
 import AssetAdvisor from "@/components/advisor/AssetAdvisor";
 import SavingsAdvisor from "@/components/advisor/SavingsAdvisor";
 import DebtAdvisor from "@/components/advisor/DebtAdvisor";
@@ -12,7 +11,6 @@ import AdvisorHistory from "@/components/advisor/AdvisorHistory";
 
 const TABS = [
   { id: "insights",    label: "AI Insights",     icon: "fas fa-lightbulb",        col: "#f0b429" },
-  { id: "whatif",      label: "What-If",          icon: "fas fa-calculator",       col: "#60a5fa" },
   { id: "asset",       label: "AssetGPT",         icon: "fas fa-building",         col: "#34d399" },
   { id: "savings",     label: "Saving Advisor",   icon: "fas fa-piggy-bank",       col: "#fbbf24" },
   { id: "debt",        label: "Debt Advisor",     icon: "fas fa-hand-holding-usd", col: "#ff6b6b" },
@@ -80,7 +78,6 @@ export default function Advisor() {
       {/* ── Active tab content ── */}
       <div className="fade-in" key={tab}>
         {tab === "insights"   && <AIInsights />}
-        {tab === "whatif"     && <WhatIf />}
         {tab === "asset"      && <AssetAdvisor />}
         {tab === "savings"    && <SavingsAdvisor />}
         {tab === "debt"       && <DebtAdvisor />}
