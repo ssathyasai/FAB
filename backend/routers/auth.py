@@ -63,6 +63,7 @@ SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", SMTP_EMAIL)
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "")
+BREVO_API_KEY = os.getenv("BREVO_API_KEY", "")
 
 
 def _is_production() -> bool:
@@ -137,6 +138,35 @@ def _send_via_resend(to_email: str, subject: str, html: str) -> None:
         raise RuntimeError(f"Resend API error ({response.status_code}): {response.text}")
 
 
+def _send_via_brevo(to_email: str, subject: str, html: str) -> None:
+    import httpx
+
+    if not BREVO_API_KEY:
+        raise ValueError("BREVO_API_KEY not configured")
+
+    from_address = (SENDER_EMAIL or SMTP_EMAIL).strip()
+    if not from_address:
+        raise ValueError("No sender address configured for Brevo")
+
+    response = httpx.post(
+        "https://api.brevo.com/v3/smtp/email",
+        headers={
+            "api-key": BREVO_API_KEY,
+            "accept": "application/json",
+            "content-type": "application/json",
+        },
+        json={
+            "sender": {"email": from_address},
+            "to": [{"email": to_email}],
+            "subject": subject,
+            "htmlContent": html,
+        },
+        timeout=15.0,
+    )
+    if response.status_code not in (200, 201, 202):
+        raise RuntimeError(f"Brevo API error ({response.status_code}): {response.text}")
+
+
 def _send_smtp(to_email: str, subject: str, html: str) -> None:
     sender = (SENDER_EMAIL or SMTP_EMAIL).strip()
     msg = MIMEMultipart()
@@ -207,6 +237,19 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
     loop = asyncio.get_event_loop()
     errors: list[str] = []
 
+    if BREVO_API_KEY:
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: _send_via_brevo(email, subject, html)),
+                timeout=20.0,
+            )
+            print(f"[OTP] [SUCCESS] Email sent via Brevo to {email}")
+            return True, "Email sent successfully"
+        except Exception as e:
+            err_msg = f"Brevo failed: {e}"
+            print(f"[OTP] [ERROR] {err_msg}")
+            errors.append(err_msg)
+
     if RESEND_API_KEY:
         try:
             await asyncio.wait_for(
@@ -244,8 +287,8 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
             print(f"[OTP] [ERROR] {err_msg}")
             errors.append(err_msg)
 
-    if not RESEND_API_KEY and not (SMTP_EMAIL and SMTP_PASSWORD):
-        err_msg = "Email not configured. Set RESEND_API_KEY or SMTP credentials."
+    if not BREVO_API_KEY and not RESEND_API_KEY and not (SMTP_EMAIL and SMTP_PASSWORD):
+        err_msg = "Email not configured. Set BREVO_API_KEY, RESEND_API_KEY or SMTP credentials."
         print(f"[OTP] [EMAIL] {err_msg}")
         if _is_production():
             return False, err_msg

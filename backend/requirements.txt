@@ -15,3 +15,4 @@ groq
 google-genai
 openai
 numpy
+sib-api-v3-sdk
