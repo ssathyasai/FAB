@@ -147,6 +147,7 @@ async def emergency_advisor(req: EmergencyAdvisorRequest, current_user=Depends(g
     # Get user's income from settings
     settings = await db.settings.find_one({"user_id": user_id})
     income = settings.get("income_baseline", 0) if settings else 0
+    savings = settings.get("bank_balance", 0) if settings else 0
     
     # Get user's monthly expenses from current month transactions
     from utils import current_month
@@ -159,12 +160,18 @@ async def emergency_advisor(req: EmergencyAdvisorRequest, current_user=Depends(g
     
     monthly_expenses = expense_res[0]["total"] if expense_res else 0
     
-    logger.info(f"[EMERGENCY ADVISOR] User: {user_id}, Income: ₹{income:,}, Expenses: ₹{monthly_expenses:,}")
+    # Get user's assets
+    assets = await db.assets.find({"user_id": user_id}).to_list(100)
+    total_assets_value = sum(a.get("current_value", a.get("value", 0)) for a in assets)
+    
+    logger.info(f"[EMERGENCY ADVISOR] User: {user_id}, Income: ₹{income:,}, Expenses: ₹{monthly_expenses:,}, Savings: ₹{savings:,}, Assets Value: ₹{total_assets_value:,}")
     
     # Build request data
     data = req.dict()
     data["income"] = income
     data["monthly_expenses"] = monthly_expenses
+    data["savings"] = savings
+    data["assets"] = [{"name": a.get("name"), "type": a.get("type"), "value": a.get("current_value", a.get("value", 0))} for a in assets]
     
     # Add user context to emergency details
     if "emergency_details" not in data:
@@ -173,6 +180,9 @@ async def emergency_advisor(req: EmergencyAdvisorRequest, current_user=Depends(g
     data["emergency_details"]["monthly_income"] = income
     data["emergency_details"]["monthly_expenses"] = monthly_expenses
     data["emergency_details"]["monthly_surplus"] = income - monthly_expenses if income > monthly_expenses else 0
+    data["emergency_details"]["available_savings"] = savings
+    data["emergency_details"]["total_assets_value"] = total_assets_value
+    data["emergency_details"]["assets"] = data["assets"]
     
     logger.info(f"[EMERGENCY ADVISOR] Emergency Type: {data.get('emergency_type')}")
     

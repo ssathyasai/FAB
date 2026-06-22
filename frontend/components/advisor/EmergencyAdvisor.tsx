@@ -35,10 +35,8 @@ export default function EmergencyAdvisor() {
 
   const getFields = (): Field[] => {
     if (eType === "Job Loss") return [
-      ["last_salary", "Your Last Monthly Salary (₹)", "number"],
       ["emi_amount", "Total Monthly EMI/Loans (₹)", "number"],
       ["severance", "Severance Package Received (₹)", "number"],
-      ["savings", "Available Savings (₹)", "number"],
       ["job_search_months", "Expected Job Search Duration (months)", "number"],
       ["has_insurance", "Health Insurance? (Yes/No)", "text"],
     ];
@@ -49,17 +47,14 @@ export default function EmergencyAdvisor() {
       ["total_cost", "Total Medical Cost Estimate (₹)", "number"],
       ["insurance_covered", "Amount Insurance Will Cover (₹)", "number"],
       ["urgency", "When is Money Needed? (Immediate/1 Week/1 Month)", "text"],
-      ["savings", "Available Cash/Savings (₹)", "number"],
     ];
     
     if (eType === "Business Loss") return [
       ["business_type", "Business Type", "text"],
       ["loss_amount", "Total Loss Amount (₹)", "number"],
-      ["monthly_expense", "Monthly Business Expenses (₹)", "number"],
       ["business_loans", "Business Loans Outstanding (₹)", "number"],
       ["can_recover", "Can Business Recover? (Yes/No/Uncertain)", "text"],
       ["recovery_months", "Recovery Timeline (months)", "number"],
-      ["savings", "Personal Savings (₹)", "number"],
     ];
     
     if (eType === "Home Damage") return [
@@ -67,7 +62,6 @@ export default function EmergencyAdvisor() {
       ["repair_cost", "Estimated Repair Cost (₹)", "number"],
       ["insurance_claim", "Insurance Claim Applied For (₹)", "number"],
       ["urgency", "Repair Urgency (Immediate/Can Wait 1 Month)", "text"],
-      ["savings", "Available Savings (₹)", "number"],
       ["alternate_living", "Need Temporary Stay? (Yes/No)", "text"],
     ];
     
@@ -77,14 +71,12 @@ export default function EmergencyAdvisor() {
       ["vehicle_damage", "Vehicle/Property Damage (₹)", "number"],
       ["insurance_covered", "Insurance Will Cover (₹)", "number"],
       ["income_loss_months", "Income Loss Duration (months)", "number"],
-      ["savings", "Available Savings (₹)", "number"],
     ];
     
     if (eType === "Family Emergency") return [
       ["emergency_type", "Emergency Type", "text"],
       ["amount_needed", "Total Amount Needed (₹)", "number"],
       ["urgency", "How Urgent (Days/Weeks)", "text"],
-      ["savings", "Available Savings (₹)", "number"],
       ["family_support", "Family Can Contribute (₹)", "number"],
     ];
     
@@ -93,7 +85,6 @@ export default function EmergencyAdvisor() {
       ["lawyer_cost", "Lawyer Fees (₹)", "number"],
       ["case_duration", "Case Duration (months)", "number"],
       ["settlement", "Settlement Amount if any (₹)", "number"],
-      ["savings", "Available Savings (₹)", "number"],
     ];
     
     if (eType === "Vehicle Breakdown") return [
@@ -102,7 +93,6 @@ export default function EmergencyAdvisor() {
       ["repair_cost", "Estimated Repair Cost (₹)", "number"],
       ["insurance_coverage", "Insurance Will Cover (₹)", "number"],
       ["need_alternate", "Need Alternative Transport? (Yes/No)", "text"],
-      ["savings", "Available Savings (₹)", "number"],
     ];
     
     return [];
