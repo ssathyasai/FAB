@@ -26,12 +26,18 @@ services:
       - key: OPENAI_API_KEY
         sync: false
       - key: SMTP_SERVER
-        value: smtp.gmail.com
+        value: smtp-relay.brevo.com
       - key: SMTP_PORT
-        value: "587"
+        value: "2525"
       - key: SMTP_EMAIL
         sync: false
       - key: SMTP_PASSWORD
+        sync: false
+      - key: SENDER_EMAIL
+        sync: false
+      - key: RESEND_API_KEY
+        sync: false
+      - key: RESEND_FROM_EMAIL
         sync: false
       - key: BANK_JSON_PATH
         value: ./bank.json

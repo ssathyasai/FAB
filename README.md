@@ -111,6 +111,32 @@ Render sets `RENDER=true` automatically. The backend refuses to start if `JWT_SE
 
 If you used the Blueprint (`render.yaml`), `JWT_SECRET` should auto-generate on first deploy. If the service was created manually, you must add it yourself.
 
+### OTP email says "sent" but nothing arrives
+
+**Common causes:**
+
+1. **Wrong From address (Brevo)** — `SENDER_EMAIL` must be your **verified sender** in Brevo (not the `@smtp-brevo.com` login). Check spam/promotions folder too.
+
+2. **Render blocks SMTP** — Render free tier blocks outbound SMTP on ports 25/587/465. Use **Resend HTTP API** instead:
+   - Create account at [resend.com](https://resend.com)
+   - Add `RESEND_API_KEY` and `RESEND_FROM_EMAIL` in Render Environment
+   - Verify your domain or sender email in Resend
+
+3. **Env vars missing on Render** — Local `.env` is not deployed. Add these in Render → Environment:
+   - `SMTP_EMAIL`, `SMTP_PASSWORD`, `SENDER_EMAIL` (for Brevo)
+   - OR `RESEND_API_KEY`, `RESEND_FROM_EMAIL` (recommended on Render)
+
+4. **Check backend logs** — Look for `[OTP] [SUCCESS]` or `[OTP] [ERROR]` lines in Render logs. OTP is also printed as `[OTP] [BACKUP]` for debugging.
+
+**Test locally:**
+```bash
+cd backend
+python test_smtp.py
+python test_email.py
+```
+
+**Check config via API:** `GET /api/auth/health-check`
+
 ---
 
 ## Tech Stack

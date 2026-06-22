@@ -61,6 +61,104 @@ SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 SENDER_EMAIL = os.getenv("SENDER_EMAIL", SMTP_EMAIL)
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+RESEND_FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "")
+
+
+def _is_production() -> bool:
+    return bool(os.getenv("RENDER") or os.getenv("ENV") == "production")
+
+
+def _format_from_address() -> str:
+    sender = (SENDER_EMAIL or SMTP_EMAIL).strip()
+    if not sender:
+        return ""
+    return f"FIN TRACKER <{sender}>"
+
+
+def _build_otp_html(otp: str, name: str) -> str:
+    return f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
+    <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 FIN TRACKER</h1>
+        <p style="color: rgba(255,255,255,0.8); margin-top: 8px; font-size:14px;">AI-Powered Financial Advisor & Budget Planner</p>
+    </div>
+
+    <div style="padding: 32px; background: #ffffff; border-radius: 16px; margin-top: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
+        <h2 style="color: #09090b; margin:0 0 8px;">Hi {name} 👋</h2>
+        <p style="color: #71717a; font-size: 15px; line-height:1.6;">
+            Welcome to FIN TRACKER! Please use the code below to verify your email address.
+            This code is valid for <strong>10 minutes</strong>.
+        </p>
+
+        <div style="background: #f4f4f5; padding: 28px; border-radius: 12px; text-align: center; margin: 28px 0;">
+            <p style="color: #71717a; font-size: 12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin:0 0 12px;">Your verification code</p>
+            <h1 style="color: #6366f1; font-size: 52px; letter-spacing: 14px; margin: 0; font-weight:800;">{otp}</h1>
+            <p style="color: #a1a1aa; font-size: 12px; margin-top: 12px;">Do not share this code with anyone</p>
+        </div>
+
+        <p style="color: #a1a1aa; font-size: 13px;">If you didn't create a FIN TRACKER account, you can safely ignore this email.</p>
+    </div>
+
+    <div style="text-align: center; margin-top: 20px; color: #a1a1aa; font-size: 12px;">
+        <p>© 2026 FIN TRACKER. All rights reserved.</p>
+    </div>
+</body>
+</html>
+"""
+
+
+def _send_via_resend(to_email: str, subject: str, html: str) -> None:
+    import httpx
+
+    if not RESEND_API_KEY:
+        raise ValueError("RESEND_API_KEY not configured")
+
+    from_address = RESEND_FROM_EMAIL or _format_from_address()
+    if not from_address:
+        raise ValueError("No sender address configured for Resend")
+
+    response = httpx.post(
+        "https://api.resend.com/emails",
+        headers={
+            "Authorization": f"Bearer {RESEND_API_KEY}",
+            "Content-Type": "application/json",
+        },
+        json={
+            "from": from_address,
+            "to": [to_email],
+            "subject": subject,
+            "html": html,
+        },
+        timeout=15.0,
+    )
+    if response.status_code not in (200, 201):
+        raise RuntimeError(f"Resend API error ({response.status_code}): {response.text}")
+
+
+def _send_smtp(to_email: str, subject: str, html: str) -> None:
+    from_addr = _format_from_address()
+    if not from_addr:
+        raise ValueError("No sender address configured for SMTP")
+
+    msg = MIMEMultipart()
+    msg["From"] = from_addr
+    msg["To"] = to_email
+    msg["Subject"] = subject
+    msg.attach(MIMEText(html, "html"))
+
+    envelope_from = (SENDER_EMAIL or SMTP_EMAIL).strip()
+
+    print(f"[OTP] [STATUS] Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15) as server:
+        print("[OTP] [STATUS] Starting TLS...")
+        server.starttls()
+        print(f"[OTP] [STATUS] Logging in as {SMTP_EMAIL}...")
+        server.login(SMTP_EMAIL, SMTP_PASSWORD)
+        print(f"[OTP] [STATUS] Sending email to {to_email} from {envelope_from}...")
+        server.sendmail(envelope_from, [to_email], msg.as_string())
+        print(f"[OTP] [SUCCESS] SMTP send completed for {to_email}")
 
 
 # ─── Request Models ──────────────────────────────────────────────
@@ -104,107 +202,62 @@ def generate_otp() -> str:
 
 
 async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool, str]:
-    """Send OTP via email. Supports Brevo SMTP (primary), Resend API, and Gmail SMTP (fallback)."""
+    """Send OTP via Resend API (Render-friendly) or SMTP (Brevo/Gmail)."""
     import asyncio
-    
-    # Always print OTP to console as backup
+
     print(f"[OTP] [BACKUP] Backup OTP for {email}: {otp}")
-    
-    body = f"""
-<html>
-<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
-    <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 FIN TRACKER</h1>
-        <p style="color: rgba(255,255,255,0.8); margin-top: 8px; font-size:14px;">AI-Powered Financial Advisor & Budget Planner</p>
-    </div>
 
-    <div style="padding: 32px; background: #ffffff; border-radius: 16px; margin-top: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
-        <h2 style="color: #09090b; margin:0 0 8px;">Hi {name} 👋</h2>
-        <p style="color: #71717a; font-size: 15px; line-height:1.6;">
-            Welcome to FIN TRACKER! Please use the code below to verify your email address.
-            This code is valid for <strong>10 minutes</strong>.
-        </p>
+    subject = "FIN TRACKER – Email Verification Code"
+    html = _build_otp_html(otp, name)
+    loop = asyncio.get_event_loop()
+    errors: list[str] = []
 
-        <div style="background: #f4f4f5; padding: 28px; border-radius: 12px; text-align: center; margin: 28px 0;">
-            <p style="color: #71717a; font-size: 12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin:0 0 12px;">Your verification code</p>
-            <h1 style="color: #6366f1; font-size: 52px; letter-spacing: 14px; margin: 0; font-weight:800;">{otp}</h1>
-            <p style="color: #a1a1aa; font-size: 12px; margin-top: 12px;">Do not share this code with anyone</p>
-        </div>
-
-        <p style="color: #a1a1aa; font-size: 13px;">If you didn't create a FIN TRACKER account, you can safely ignore this email.</p>
-    </div>
-
-    <div style="text-align: center; margin-top: 20px; color: #a1a1aa; font-size: 12px;">
-        <p>© 2026 FIN TRACKER. All rights reserved.</p>
-    </div>
-</body>
-</html>
-"""
-
-    try:
-        # Check if SMTP is configured
-        if not SMTP_EMAIL or not SMTP_PASSWORD:
-            print(f"[OTP] [EMAIL] Email not configured. Using console OTP only.")
-            return True, "Email not configured, bypassed using console backup."
-
-        # Create email message for SMTP
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_EMAIL
-        msg['To'] = email
-        msg['Subject'] = "FIN TRACKER – Email Verification Code"
-        msg.attach(MIMEText(body, 'html'))
-
-        # Send email synchronously with timeout
-        loop = asyncio.get_event_loop()
+    if RESEND_API_KEY:
         try:
             await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    lambda: _send_smtp(msg, email, otp)
-                ),
-                timeout=15.0
+                loop.run_in_executor(None, lambda: _send_via_resend(email, subject, html)),
+                timeout=20.0,
             )
-            print(f"[OTP] [SUCCESS] Email sent successfully via SMTP to {email}")
+            print(f"[OTP] [SUCCESS] Email sent via Resend to {email}")
             return True, "Email sent successfully"
-            
-        except asyncio.TimeoutError:
-            err_msg = f"SMTP Connection Timeout: Connecting to {SMTP_SERVER}:{SMTP_PORT} timed out. Outbound SMTP ports might be blocked."
-            print(f"[OTP] [TIMEOUT] {err_msg}")
-            return False, err_msg
         except Exception as e:
-            err_msg = f"SMTP Failed: {str(e)}"
+            err_msg = f"Resend failed: {e}"
             print(f"[OTP] [ERROR] {err_msg}")
-            import traceback
-            traceback.print_exc()
+            errors.append(err_msg)
+
+    if SMTP_EMAIL and SMTP_PASSWORD:
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(None, lambda: _send_smtp(email, subject, html)),
+                timeout=20.0,
+            )
+            print(f"[OTP] [SUCCESS] Email sent via SMTP to {email}")
+            return True, "Email sent successfully"
+        except asyncio.TimeoutError:
+            err_msg = (
+                f"SMTP timeout connecting to {SMTP_SERVER}:{SMTP_PORT}. "
+                "On Render, SMTP ports may be blocked — set RESEND_API_KEY instead."
+            )
+            print(f"[OTP] [TIMEOUT] {err_msg}")
+            errors.append(err_msg)
+        except smtplib.SMTPAuthenticationError as e:
+            err_msg = f"SMTP authentication failed: {e}"
+            print(f"[OTP] [ERROR] {err_msg}")
+            errors.append(err_msg)
+        except Exception as e:
+            err_msg = f"SMTP failed: {e}"
+            print(f"[OTP] [ERROR] {err_msg}")
+            errors.append(err_msg)
+
+    if not RESEND_API_KEY and not (SMTP_EMAIL and SMTP_PASSWORD):
+        err_msg = "Email not configured. Set RESEND_API_KEY or SMTP credentials."
+        print(f"[OTP] [EMAIL] {err_msg}")
+        if _is_production():
             return False, err_msg
-        
-    except Exception as e:
-        err_msg = f"Unexpected email module error: {str(e)}"
-        print(f"[OTP] [ERROR] {err_msg}")
-        import traceback
-        traceback.print_exc()
-        return False, err_msg
+        return True, "Email not configured, console backup only."
 
-
-def _send_smtp(msg, email, otp):
-    """Synchronous SMTP send helper"""
-    try:
-        print(f"[OTP] [STATUS] Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
-            print(f"[OTP] [STATUS] Starting TLS...")
-            server.starttls()
-            print(f"[OTP] [STATUS] Logging in as {SMTP_EMAIL}...")
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            print(f"[OTP] [STATUS] Sending email to {email}...")
-            server.send_message(msg)
-            print(f"[OTP] [SUCCESS] SMTP send_message completed for {email}")
-    except smtplib.SMTPAuthenticationError as e:
-        print(f"[OTP] [ERROR] SMTP Authentication Error: {e}")
-        print(f"[OTP] [TIP] Check your app password at https://myaccount.google.com/apppasswords")
-        raise
-    except Exception as e:
-        print(f"[OTP] [ERROR] SMTP Error: {e}")
-        raise
+    combined = "; ".join(errors) if errors else "Email delivery failed"
+    return False, combined
 
 
 async def get_current_user(
@@ -568,12 +621,12 @@ async def me(current_user=Depends(get_current_user)):
 
 @router.get("/health-check")
 async def health_check():
-    """Health check endpoint to verify SMTP configuration"""
+    """Health check endpoint to verify email configuration"""
     return {
         "status": "ok",
+        "resend_configured": bool(RESEND_API_KEY),
         "smtp_configured": bool(SMTP_EMAIL and SMTP_PASSWORD),
-        "smtp_email": SMTP_EMAIL if SMTP_EMAIL else "not configured",
+        "sender_email": SENDER_EMAIL or "not configured",
         "smtp_server": SMTP_SERVER,
         "smtp_port": SMTP_PORT,
-        "smtp_password_length": len(SMTP_PASSWORD) if SMTP_PASSWORD else 0
     }
