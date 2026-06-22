@@ -245,9 +245,9 @@ export default function BankAccounts() {
       <div
         className="card"
         style={{
-          maxWidth: "600px",
+          maxWidth: "400px",
           margin: "0 auto 2rem",
-          padding: "3rem 2.5rem",
+          padding: "2rem 1.5rem",
           textAlign: "center",
           background: "linear-gradient(135deg, rgba(139,92,246,0.08) 0%, rgba(6,182,212,0.06) 100%)",
           border: "1px solid rgba(139,92,246,0.20)",
@@ -357,29 +357,7 @@ export default function BankAccounts() {
           </>
         )}
 
-        {/* Info Text */}
-        <div
-          style={{
-            marginTop: "2rem",
-            padding: "1rem",
-            background: "rgba(255,255,255,0.03)",
-            border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: "10px",
-            fontSize: "0.82rem",
-            color: "var(--text3)",
-            textAlign: "left",
-          }}
-        >
-          <div style={{ marginBottom: "0.5rem", fontWeight: 600, color: "var(--text2)" }}>
-            <i className="fas fa-info-circle" /> How it works:
-          </div>
-          <ul style={{ margin: 0, paddingLeft: "1.2rem", lineHeight: 1.6 }}>
-            <li>This balance is set during budget setup</li>
-            <li>When you add money → Auto-categorized as Income ✅</li>
-            <li>When you spend money → Appears in Transactions (needs categorization)</li>
-            <li>Update this balance anytime to reflect your current account</li>
-          </ul>
-        </div>
+
       </div>
 
       {/* ── Transactions Section ── */}
