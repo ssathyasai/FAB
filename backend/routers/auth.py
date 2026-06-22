@@ -48,16 +48,6 @@ SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 
-# Mailgun - 100 emails/day FREE forever!
-MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY", "")
-MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN", "")
-MAILGUN_FROM_EMAIL = os.getenv("MAILGUN_FROM_EMAIL", "")
-
-# Brevo (formerly Sendinblue) SMTP
-BREVO_SMTP_KEY = os.getenv("BREVO_SMTP_KEY", "")
-BREVO_SMTP_SERVER = os.getenv("BREVO_SMTP_SERVER", "smtp-relay.brevo.com")
-BREVO_SMTP_PORT = int(os.getenv("BREVO_SMTP_PORT", "587"))
-
 
 
 
@@ -296,51 +286,6 @@ def _send_brevo_smtp(msg, email):
     except Exception as e:
         print(f"[OTP] [ERROR] Brevo SMTP Error: {e}")
         raise
-                print(f"[OTP] [ERROR] {err_msg}")
-                return False, err_msg
-
-        # 2. Fall back to SMTP
-        if not SMTP_EMAIL or not SMTP_PASSWORD:
-            print(f"[OTP] [EMAIL] Email not configured (no RESEND_API_KEY and SMTP_EMAIL/SMTP_PASSWORD is missing). Using console OTP only.")
-            return True, "Email not configured, bypassed using console backup."
-
-        # Create email message for SMTP
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_EMAIL
-        msg['To'] = email
-        msg['Subject'] = "AI FAB – Email Verification Code"
-        msg.attach(MIMEText(body, 'html'))
-
-        # Send email synchronously with timeout
-        loop = asyncio.get_event_loop()
-        try:
-            await asyncio.wait_for(
-                loop.run_in_executor(
-                    None,
-                    lambda: _send_smtp(msg, email, otp)
-                ),
-                timeout=15.0  # 15 second timeout
-            )
-            print(f"[OTP] [SUCCESS] Email sent successfully to {email}")
-            return True, "Email sent successfully via SMTP"
-            
-        except asyncio.TimeoutError:
-            err_msg = f"SMTP Connection Timeout: Connecting to {SMTP_SERVER}:{SMTP_PORT} timed out. Outbound SMTP ports might be blocked by your hosting provider (e.g. Render Free Tier blocks SMTP). Please configure RESEND_API_KEY."
-            print(f"[OTP] [TIMEOUT] {err_msg}")
-            return False, err_msg
-        except Exception as e:
-            err_msg = f"SMTP Failed: {str(e)}"
-            print(f"[OTP] [ERROR] SMTP Failed: {str(e)}")
-            import traceback
-            traceback.print_exc()
-            return False, err_msg
-        
-    except Exception as e:
-        err_msg = f"Unexpected email module error: {str(e)}"
-        print(f"[OTP] [ERROR] Unexpected email module error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return False, err_msg
 
 
 def _send_smtp(msg, email, otp):
