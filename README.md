@@ -92,6 +92,27 @@ Go back to Render and update:
 
 ---
 
+## Troubleshooting Deploy
+
+### `JWT_SECRET must be set to a secure random value in production`
+
+Render sets `RENDER=true` automatically. The backend refuses to start if `JWT_SECRET` is missing or still the dev default.
+
+**Fix:**
+1. Open [Render Dashboard](https://dashboard.render.com) → your **backend** web service
+2. Go to **Environment**
+3. Add or update:
+   - **Key:** `JWT_SECRET`
+   - **Value:** a long random string (32+ chars), e.g. generate locally:
+     ```bash
+     python -c "import secrets; print(secrets.token_urlsafe(32))"
+     ```
+4. Click **Save Changes** — Render will redeploy automatically
+
+If you used the Blueprint (`render.yaml`), `JWT_SECRET` should auto-generate on first deploy. If the service was created manually, you must add it yourself.
+
+---
+
 ## Tech Stack
 - **Frontend**: Next.js 14, TypeScript, Tailwind CSS
 - **Backend**: FastAPI, Python, Motor (async MongoDB)

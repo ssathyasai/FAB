@@ -14,6 +14,9 @@ import string
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
@@ -25,9 +28,10 @@ EXPIRE_DAYS = 30
 
 # Validate JWT secret in production
 if os.getenv("RENDER") or os.getenv("ENV") == "production":
-    if SECRET == "fab_finance_secret_key_2024":
+    if not os.getenv("JWT_SECRET") or SECRET == "fab_finance_secret_key_2024":
         raise ValueError(
             "🔴 SECURITY ERROR: JWT_SECRET must be set to a secure random value in production! "
+            "In Render: Dashboard → your backend service → Environment → add JWT_SECRET. "
             "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
         )
 
