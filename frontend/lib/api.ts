@@ -26,6 +26,13 @@ export const createBankAccount = (d: object)   => api.post("/api/bank/accounts",
 export const updateBankAccount = (id: string, d: object) => api.put(`/api/bank/accounts/${id}`, d);
 export const deleteBankAccount = (id: string)  => api.delete(`/api/bank/accounts/${id}`);
 export const updateBalance     = (id: string, d: object) => api.post(`/api/bank/accounts/${id}/update-balance`, d);
+export const scanReceipt = (file: File) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  return api.post("/api/bank/scan-receipt", formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+};
 export const bankTransfer      = (d: object)   => api.post("/api/bank/transfer", d);
 export const getDashboardSummary = () => api.get("/api/dashboard/summary");
 export const getLeakDetector = () => api.get("/api/dashboard/leak-detector");

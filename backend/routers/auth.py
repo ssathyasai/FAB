@@ -45,6 +45,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+SENDER_EMAIL = os.getenv("SENDER_EMAIL", SMTP_EMAIL)
 
 
 # ─── Request Models ──────────────────────────────────────────────
@@ -131,9 +132,9 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
             print(f"[OTP] [EMAIL] Email not configured. Using console OTP only.")
             return True, "Email not configured, bypassed using console backup."
 
-        # Create email message for Gmail SMTP
+        # Create email message for SMTP
         msg = MIMEMultipart()
-        msg['From'] = SMTP_EMAIL
+        msg['From'] = SENDER_EMAIL
         msg['To'] = email
         msg['Subject'] = "AI FAB – Email Verification Code"
         msg.attach(MIMEText(body, 'html'))

@@ -2,7 +2,7 @@
 Bank Section — replaces bank.json manual editing.
 Users manage their bank accounts directly in the app.
 """
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
 from database import get_db
 from utils import serialize_doc, serialize_docs, current_month
 from datetime import datetime
@@ -435,3 +435,22 @@ async def record_transaction(txn: dict):
         "new_balance": new_balance,
         "leak_detected": leak_detected,
     }
+
+
+@router.post("/scan-receipt")
+async def scan_receipt(file: UploadFile = File(...)):
+    """
+    Scan a bill/receipt image and extract transaction details.
+    """
+    image_bytes = await file.read()
+    mime_type = file.content_type or "image/jpeg"
+    
+    try:
+        from ai_service import analyze_receipt
+        parsed_data = await analyze_receipt(image_bytes, mime_type)
+        return {"success": True, "data": parsed_data}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+

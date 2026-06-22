@@ -201,6 +201,89 @@ def _parse_json(text: str) -> dict:
     return json.loads(json_str)
 
 
+# ─── Vision Analysis ─────────────────────────────────────────────
+
+async def analyze_receipt(image_bytes: bytes, mime_type: str = "image/jpeg") -> dict:
+    """Analyze a receipt/bill image and return amount, category, and note."""
+    providers = _get_provider_config()
+    
+    if not providers:
+        raise ValueError("No AI provider configured. Add GEMINI_API_KEY or OPENAI_API_KEY.")
+        
+    import base64
+    base64_image = base64.b64encode(image_bytes).decode('utf-8')
+    
+    prompt = '''You are an expert receipt analyzer.
+Analyze the provided receipt/bill image and extract:
+1. The total amount paid (as a number).
+2. The category of the expense (e.g., Food, Transport, Utilities, Shopping, Entertainment, Healthcare).
+3. The merchant or vendor name (as a short note).
+
+Respond ONLY with a valid JSON object matching exactly this schema:
+{"amount": 12.50, "category": "Food", "note": "Merchant Name"}
+Ensure "amount" is a float, "category" and "note" are strings. Do not include markdown formatting like ```json.
+'''
+
+    last_error = None
+    
+    for provider in providers:
+        try:
+            if provider["name"] == "gemini":
+                from google import genai
+                from google.genai import types
+                client = genai.Client(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.models.generate_content(
+                        model="gemini-2.0-flash-lite",
+                        contents=[
+                            prompt,
+                            types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                        ]
+                    )
+                )
+                return _parse_json(response.text)
+                
+            elif provider["name"] == "openai":
+                from openai import OpenAI
+                client = OpenAI(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+                
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages,
+                        max_tokens=300,
+                        temperature=0.0
+                    )
+                )
+                return _parse_json(response.choices[0].message.content)
+                
+        except Exception as e:
+            last_error = e
+            continue
+            
+    if last_error:
+        raise ValueError(f"Receipt analysis failed. (Note: Ensure GEMINI or OPENAI keys are valid). Last Error: {last_error}")
+    raise ValueError("No vision-capable AI provider configured. Add GEMINI_API_KEY or OPENAI_API_KEY.")
+
 # ─── High-Level Functions (for backward compatibility) ──────────
 
 async def get_gemini_response(prompt: str) -> str:

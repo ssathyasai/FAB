@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api, getTransactions, categorizeTransaction, splitCategorizeTransaction } from "@/lib/api";
+import { api, getTransactions, categorizeTransaction, splitCategorizeTransaction, scanReceipt } from "@/lib/api";
 import { formatINR, formatDate, formatTime, EXPENSE_CATEGORIES, CATEGORY_ICONS } from "@/lib/utils";
 import { PageHeader, Loading, Empty } from "@/components/ui";
 import toast from "react-hot-toast";
@@ -40,6 +40,35 @@ export default function BankAccounts() {
     { expense_category: "", amount: "", note: "" },
     { expense_category: "", amount: "", note: "" },
   ]);
+
+  const [scanning, setScanning] = useState(false);
+
+  const handleScanReceipt = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setScanning(true);
+    const toastId = toast.loading("Scanning bill with AI...");
+    try {
+      const response = await scanReceipt(file);
+      const { amount, category, note } = response.data.data;
+      
+      setNewTxn({
+        amount: String(amount || ""),
+        type: "debit",
+        category: category || "",
+        note: note || "",
+        actual_price: "",
+      });
+      setAddingNew(true);
+      toast.success("Bill scanned successfully!", { id: toastId });
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Failed to scan bill", { id: toastId });
+    } finally {
+      setScanning(false);
+      if (e.target) e.target.value = "";
+    }
+  };
 
   const loadBalance = async () => {
     try {
@@ -371,9 +400,26 @@ export default function BankAccounts() {
             {total} total · {txns.filter((t) => t.status === "pending").length} pending
           </p>
         </div>
-        <button onClick={() => setAddingNew(true)} className="btn-primary" style={{ width: "auto", padding: "0.7rem 1.3rem" }}>
-          <i className="fas fa-plus" /> Add Transaction
-        </button>
+        <div style={{ display: "flex", gap: "0.8rem" }}>
+          <button 
+            onClick={() => document.getElementById("receipt-scanner")?.click()}
+            className="btn-secondary" 
+            disabled={scanning}
+            style={{ width: "auto", padding: "0.7rem 1.3rem", background: "rgba(139, 92, 246, 0.1)", color: "#8b5cf6", borderColor: "rgba(139, 92, 246, 0.2)" }}
+          >
+            <i className={scanning ? "fas fa-spinner fa-spin" : "fas fa-camera"} /> {scanning ? "Scanning..." : "Scan Bill"}
+          </button>
+          <input 
+            id="receipt-scanner"
+            type="file" 
+            accept="image/*" 
+            style={{ display: "none" }} 
+            onChange={handleScanReceipt} 
+          />
+          <button onClick={() => setAddingNew(true)} className="btn-primary" style={{ width: "auto", padding: "0.7rem 1.3rem" }}>
+            <i className="fas fa-plus" /> Add Transaction
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
