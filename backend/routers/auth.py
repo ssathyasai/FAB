@@ -45,6 +45,7 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
 
 
 # ─── Request Models ──────────────────────────────────────────────
@@ -126,6 +127,47 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
 """
 
     try:
+        # Try sending via Resend API if configured
+        resend_key = os.getenv("RESEND_API_KEY", "")
+        if resend_key:
+            import httpx
+            from_email = os.getenv("RESEND_FROM_EMAIL", "AI FAB <onboarding@resend.dev>")
+            print(f"[OTP] [STATUS] Sending via Resend API to {email} using sender '{from_email}'...")
+            try:
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(
+                        "https://api.resend.com/emails",
+                        headers={
+                            "Authorization": f"Bearer {resend_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "from": from_email,
+                            "to": [email],
+                            "subject": "AI FAB – Email Verification Code",
+                            "html": body,
+                        },
+                        timeout=15.0
+                    )
+                    if res.status_code in (200, 201):
+                        print(f"[OTP] [SUCCESS] Email sent successfully via Resend to {email}")
+                        return True, "Email sent successfully via Resend API"
+                    else:
+                        err_detail = res.text
+                        try:
+                            err_json = res.json()
+                            if "message" in err_json:
+                                err_detail = err_json["message"]
+                        except:
+                            pass
+                        err_msg = f"Resend API Error ({res.status_code}): {err_detail}"
+                        print(f"[OTP] [ERROR] {err_msg}")
+                        # Don't return, fall through to Gmail SMTP
+            except Exception as e:
+                err_msg = f"Resend connection failed: {str(e)}"
+                print(f"[OTP] [ERROR] {err_msg}")
+                # Fall through to Gmail SMTP
+
         # Fall back to Gmail SMTP
         if not SMTP_EMAIL or not SMTP_PASSWORD:
             print(f"[OTP] [EMAIL] Email not configured. Using console OTP only.")
@@ -543,8 +585,11 @@ async def me(current_user=Depends(get_current_user)):
 @router.get("/health-check")
 async def health_check():
     """Health check endpoint to verify SMTP configuration"""
+    resend_key = os.getenv("RESEND_API_KEY", "")
     return {
         "status": "ok",
+        "resend_configured": bool(resend_key),
+        "resend_from_email": os.getenv("RESEND_FROM_EMAIL", "AI FAB <onboarding@resend.dev>") if resend_key else "not configured",
         "smtp_configured": bool(SMTP_EMAIL and SMTP_PASSWORD),
         "smtp_email": SMTP_EMAIL if SMTP_EMAIL else "not configured",
         "smtp_server": SMTP_SERVER,
