@@ -138,8 +138,9 @@ def _send_via_resend(to_email: str, subject: str, html: str) -> None:
 
 
 def _send_smtp(to_email: str, subject: str, html: str) -> None:
+    sender = (SENDER_EMAIL or SMTP_EMAIL).strip()
     msg = MIMEMultipart()
-    msg["From"] = SMTP_EMAIL
+    msg["From"] = sender
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(html, "html"))
