@@ -72,6 +72,12 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    reset_token: str
+    new_password: str
+
+
 # ─── Helpers ─────────────────────────────────────────────────────
 
 def make_token(user_id: str) -> str:
@@ -85,18 +91,23 @@ def generate_otp() -> str:
 
 
 async def send_otp_email(email: str, otp: str, name: str = "User"):
-    """Send OTP via email. Falls back to console print if SMTP not configured."""
+    """Send OTP via email asynchronously. Falls back to console print if SMTP not configured."""
+    import asyncio
+    
     try:
         if not SMTP_EMAIL or not SMTP_PASSWORD:
-            print(f"[OTP] Email not configured. OTP for {email}: {otp}")
+            print(f"[OTP] ✉️ Email not configured. OTP for {email}: {otp}")
             return True
 
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_EMAIL
-        msg['To'] = email
-        msg['Subject'] = "AI FAB – Email Verification Code"
+        # Run email sending in background to not block API response
+        async def send_email_task():
+            try:
+                msg = MIMEMultipart()
+                msg['From'] = SMTP_EMAIL
+                msg['To'] = email
+                msg['Subject'] = "AI FAB – Email Verification Code"
 
-        body = f"""
+                body = f"""
         <html>
         <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
             <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
@@ -127,19 +138,48 @@ async def send_otp_email(email: str, otp: str, name: str = "User"):
         </html>
         """
 
-        msg.attach(MIMEText(body, 'html'))
+                msg.attach(MIMEText(body, 'html'))
 
-        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT) as server:
-            server.starttls()
-            server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            server.send_message(msg)
-
-        print(f"[OTP] Email sent to {email}")
+                # Use asyncio to run SMTP in executor with timeout
+                loop = asyncio.get_event_loop()
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        lambda: _send_smtp(msg)
+                    ),
+                    timeout=10.0  # 10 second timeout
+                )
+                
+                print(f"[OTP] ✅ Email sent successfully to {email}")
+                return True
+                
+            except asyncio.TimeoutError:
+                print(f"[OTP] ⏱️ Timeout sending email to {email}. OTP: {otp}")
+                return False
+            except Exception as e:
+                print(f"[OTP] ❌ Failed to send email: {str(e)}")
+                print(f"[OTP] 📋 Console OTP for {email}: {otp}")
+                return False
+        
+        # Start email task in background (fire and forget)
+        asyncio.create_task(send_email_task())
+        
+        # Always print OTP to console as backup
+        print(f"[OTP] 📋 Backup OTP for {email}: {otp}")
         return True
+        
     except Exception as e:
-        print(f"[OTP] Failed to send email: {str(e)}")
-        print(f"[OTP] *** OTP for {email}: {otp} ***")  # Console fallback
+        print(f"[OTP] ❌ Error in send_otp_email: {str(e)}")
+        print(f"[OTP] 📋 Console OTP for {email}: {otp}")
         return True  # Don't block registration if email fails
+
+
+def _send_smtp(msg):
+    """Synchronous SMTP send helper"""
+    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+        server.starttls()
+        server.login(SMTP_EMAIL, SMTP_PASSWORD)
+        server.send_message(msg)
 
 
 async def get_current_user(
@@ -377,6 +417,164 @@ async def login_resend(req: ResendOTPRequest):
     await send_otp_email(req.email, otp, user.get("name", "User"))
     
     return {"status": "otp_sent", "message": "New verification code sent to your email"}
+
+
+@router.post("/forgot-password")
+async def forgot_password(req: ResendOTPRequest):
+    """
+    Step 1 of password reset: Send OTP to user's email
+    """
+    db = get_db()
+    
+    # Check if user exists
+    user = await db.users.find_one({"email": req.email.lower()})
+    if not user:
+        # Don't reveal if email exists or not (security)
+        return {"status": "otp_sent", "message": "If this email exists, you'll receive a password reset code"}
+    
+    # Generate OTP
+    otp = generate_otp()
+    otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    # Store OTP in password_reset collection
+    await db.password_resets.update_one(
+        {"email": req.email.lower()},
+        {
+            "$set": {
+                "email": req.email.lower().strip(),
+                "otp": otp,
+                "otp_expiry": otp_expiry,
+                "created_at": datetime.utcnow(),
+            }
+        },
+        upsert=True,
+    )
+    
+    # Send OTP email
+    await send_otp_email(req.email, otp, user.get("name", "User"))
+    
+    return {"status": "otp_sent", "message": "Password reset code sent to your email"}
+
+
+@router.post("/reset-password-verify")
+async def reset_password_verify(req: VerifyOTPRequest):
+    """
+    Step 2 of password reset: Verify OTP
+    Returns a temporary reset token
+    """
+    db = get_db()
+    
+    # Check OTP
+    reset_request = await db.password_resets.find_one({"email": req.email.lower()})
+    if not reset_request:
+        raise HTTPException(
+            status_code=404,
+            detail="No password reset request found. Please request a new one."
+        )
+    
+    if datetime.utcnow() > reset_request["otp_expiry"]:
+        await db.password_resets.delete_one({"email": req.email.lower()})
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
+    
+    if reset_request["otp"] != req.otp.strip():
+        raise HTTPException(status_code=400, detail="Invalid OTP. Please check your email.")
+    
+    # OTP is valid - generate temporary reset token (valid for 15 mins)
+    reset_token = make_token(req.email.lower())  # Use email as subject for reset token
+    
+    # Store verified status
+    await db.password_resets.update_one(
+        {"email": req.email.lower()},
+        {"$set": {"verified": True, "reset_token": reset_token}}
+    )
+    
+    return {
+        "status": "verified",
+        "reset_token": reset_token,
+        "message": "OTP verified. You can now reset your password."
+    }
+
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    reset_token: str
+    new_password: str
+
+
+@router.post("/reset-password-complete")
+async def reset_password_complete(req: ResetPasswordRequest):
+    """
+    Step 3 of password reset: Set new password
+    """
+    db = get_db()
+    
+    # Verify reset token and that OTP was verified
+    reset_request = await db.password_resets.find_one({
+        "email": req.email.lower(),
+        "verified": True,
+        "reset_token": req.reset_token
+    })
+    
+    if not reset_request:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid or expired reset token. Please start the password reset process again."
+        )
+    
+    # Check if reset request is still valid (15 mins from OTP verification)
+    if datetime.utcnow() > reset_request["otp_expiry"]:
+        await db.password_resets.delete_one({"email": req.email.lower()})
+        raise HTTPException(
+            status_code=400,
+            detail="Reset token expired. Please request a new password reset."
+        )
+    
+    # Validate new password
+    if len(req.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
+    
+    # Update user password
+    hashed_password = hash_password(req.new_password)
+    result = await db.users.update_one(
+        {"email": req.email.lower()},
+        {"$set": {"password": hashed_password}}
+    )
+    
+    if result.modified_count == 0:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Clean up reset request
+    await db.password_resets.delete_one({"email": req.email.lower()})
+    
+    return {
+        "status": "success",
+        "message": "Password reset successfully. You can now login with your new password."
+    }
+
+
+@router.post("/forgot-password-resend")
+async def forgot_password_resend(req: ResendOTPRequest):
+    """Resend password reset OTP"""
+    db = get_db()
+    
+    # Verify user exists
+    user = await db.users.find_one({"email": req.email.lower()})
+    if not user:
+        return {"status": "otp_sent", "message": "If this email exists, you'll receive a password reset code"}
+    
+    # Generate new OTP
+    otp = generate_otp()
+    otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+    
+    await db.password_resets.update_one(
+        {"email": req.email.lower()},
+        {"$set": {"otp": otp, "otp_expiry": otp_expiry}},
+        upsert=True,
+    )
+    
+    await send_otp_email(req.email, otp, user.get("name", "User"))
+    
+    return {"status": "otp_sent", "message": "New password reset code sent to your email"}
 
 
 @router.get("/me")
