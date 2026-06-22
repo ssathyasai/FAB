@@ -32,6 +32,7 @@ async def get_settings(current_user=Depends(get_current_user)):
             "openai_api_key": env_openai_key if env_openai_key else "",
             "bank_enabled": True,
             "onboarding_complete": False,
+            "tour_complete": False,
         }
     result = serialize_doc(doc)
     

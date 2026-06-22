@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from passlib.context import CryptContext
@@ -6,6 +6,8 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta
 from database import get_db
 from utils import serialize_doc
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 import os
 import random
 import string
@@ -15,10 +17,19 @@ from email.mime.multipart import MIMEMultipart
 
 router = APIRouter()
 bearer = HTTPBearer(auto_error=False)
+limiter = Limiter(key_func=get_remote_address)
 
 SECRET = os.getenv("JWT_SECRET", "fab_finance_secret_key_2024")
 ALGO = "HS256"
 EXPIRE_DAYS = 30
+
+# Validate JWT secret in production
+if os.getenv("RENDER") or os.getenv("ENV") == "production":
+    if SECRET == "fab_finance_secret_key_2024":
+        raise ValueError(
+            "🔴 SECURITY ERROR: JWT_SECRET must be set to a secure random value in production! "
+            "Generate one with: python -c 'import secrets; print(secrets.token_urlsafe(32))'"
+        )
 
 pwd = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
@@ -99,14 +110,14 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
     <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
-        <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 AI FAB</h1>
+        <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 FIN TRACKER</h1>
         <p style="color: rgba(255,255,255,0.8); margin-top: 8px; font-size:14px;">AI-Powered Financial Advisor & Budget Planner</p>
     </div>
 
     <div style="padding: 32px; background: #ffffff; border-radius: 16px; margin-top: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
         <h2 style="color: #09090b; margin:0 0 8px;">Hi {name} 👋</h2>
         <p style="color: #71717a; font-size: 15px; line-height:1.6;">
-            Welcome to AI FAB! Please use the code below to verify your email address.
+            Welcome to FIN TRACKER! Please use the code below to verify your email address.
             This code is valid for <strong>10 minutes</strong>.
         </p>
 
@@ -116,11 +127,11 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
             <p style="color: #a1a1aa; font-size: 12px; margin-top: 12px;">Do not share this code with anyone</p>
         </div>
 
-        <p style="color: #a1a1aa; font-size: 13px;">If you didn't create an AI FAB account, you can safely ignore this email.</p>
+        <p style="color: #a1a1aa; font-size: 13px;">If you didn't create a FIN TRACKER account, you can safely ignore this email.</p>
     </div>
 
     <div style="text-align: center; margin-top: 20px; color: #a1a1aa; font-size: 12px;">
-        <p>© 2026 AI FAB. All rights reserved.</p>
+        <p>© 2026 FIN TRACKER. All rights reserved.</p>
     </div>
 </body>
 </html>
@@ -134,9 +145,9 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
 
         # Create email message for SMTP
         msg = MIMEMultipart()
-        msg['From'] = SENDER_EMAIL
+        msg['From'] = SMTP_EMAIL
         msg['To'] = email
-        msg['Subject'] = "AI FAB – Email Verification Code"
+        msg['Subject'] = "FIN TRACKER – Email Verification Code"
         msg.attach(MIMEText(body, 'html'))
 
         # Send email synchronously with timeout
@@ -214,7 +225,8 @@ async def get_current_user(
 # ─── Routes ──────────────────────────────────────────────────────
 
 @router.post("/register")
-async def register(req: RegisterRequest):
+@limiter.limit("5/hour")  # 5 registration attempts per hour per IP
+async def register(request: Request, req: RegisterRequest):
     db = get_db()
 
     # Check if email is already a verified user
@@ -250,7 +262,8 @@ async def register(req: RegisterRequest):
 
 
 @router.post("/verify-otp")
-async def verify_otp(req: VerifyOTPRequest):
+@limiter.limit("10/hour")  # 10 OTP verification attempts per hour
+async def verify_otp(request: Request, req: VerifyOTPRequest):
     db = get_db()
 
     pending = await db.pending_registrations.find_one({"email": req.email.lower()})
@@ -292,7 +305,8 @@ async def verify_otp(req: VerifyOTPRequest):
 
 
 @router.post("/resend-otp")
-async def resend_otp(req: ResendOTPRequest):
+@limiter.limit("3/hour")  # 3 OTP resend attempts per hour
+async def resend_otp(request: Request, req: ResendOTPRequest):
     db = get_db()
 
     pending = await db.pending_registrations.find_one({"email": req.email.lower()})
@@ -318,7 +332,8 @@ async def resend_otp(req: ResendOTPRequest):
 
 
 @router.post("/login")
-async def login(req: LoginRequest):
+@limiter.limit("10/hour")  # 10 login attempts per hour per IP
+async def login(request: Request, req: LoginRequest):
     db = get_db()
     user = await db.users.find_one({"email": req.email.lower().strip()})
     if not user:
@@ -351,7 +366,8 @@ async def login(req: LoginRequest):
 
 
 @router.post("/login-verify")
-async def login_verify(req: VerifyOTPRequest):
+@limiter.limit("10/hour")
+async def login_verify(request: Request, req: VerifyOTPRequest):
     db = get_db()
     
     login_otp = await db.login_otps.find_one({"email": req.email.lower()})
@@ -383,7 +399,8 @@ async def login_verify(req: VerifyOTPRequest):
 
 
 @router.post("/login-resend")
-async def login_resend(req: ResendOTPRequest):
+@limiter.limit("3/hour")
+async def login_resend(request: Request, req: ResendOTPRequest):
     db = get_db()
     
     user = await db.users.find_one({"email": req.email.lower()})
@@ -407,7 +424,8 @@ async def login_resend(req: ResendOTPRequest):
 
 
 @router.post("/forgot-password")
-async def forgot_password(req: ResendOTPRequest):
+@limiter.limit("5/hour")  # 5 password reset attempts per hour
+async def forgot_password(request: Request, req: ResendOTPRequest):
     db = get_db()
     
     user = await db.users.find_one({"email": req.email.lower()})
@@ -438,7 +456,8 @@ async def forgot_password(req: ResendOTPRequest):
 
 
 @router.post("/reset-password-verify")
-async def reset_password_verify(req: VerifyOTPRequest):
+@limiter.limit("10/hour")
+async def reset_password_verify(request: Request, req: VerifyOTPRequest):
     db = get_db()
     
     reset_request = await db.password_resets.find_one({"email": req.email.lower()})
@@ -470,7 +489,8 @@ async def reset_password_verify(req: VerifyOTPRequest):
 
 
 @router.post("/reset-password-complete")
-async def reset_password_complete(req: ResetPasswordRequest):
+@limiter.limit("5/hour")
+async def reset_password_complete(request: Request, req: ResetPasswordRequest):
     db = get_db()
     
     reset_request = await db.password_resets.find_one({
@@ -513,7 +533,8 @@ async def reset_password_complete(req: ResetPasswordRequest):
 
 
 @router.post("/forgot-password-resend")
-async def forgot_password_resend(req: ResendOTPRequest):
+@limiter.limit("3/hour")
+async def forgot_password_resend(request: Request, req: ResendOTPRequest):
     db = get_db()
     
     user = await db.users.find_one({"email": req.email.lower()})

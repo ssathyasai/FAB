@@ -55,7 +55,7 @@ export default function Sidebar() {
 
   return (
     <aside className="sidebar">
-      <Link href="/budget/overview" className="sidebar-logo">
+      <Link href="/budget/overview" className="sidebar-logo" data-tour="sidebar-logo">
         <div className="sidebar-logo-icon">
           <i className="fas fa-coins" />
         </div>
@@ -66,38 +66,40 @@ export default function Sidebar() {
       </Link>
 
       <nav className="sidebar-nav">
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-tour="budget-section">
           <div className="sidebar-section-label">Budget</div>
           {BUDGET_ITEMS.map(item => (
             <NavLink key={item.href} {...item} />
           ))}
         </div>
 
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-tour="finance-section">
           <div className="sidebar-section-label">Finance</div>
           {FINANCE_ITEMS.map(item => (
             <NavLink key={item.href} {...item} />
           ))}
         </div>
 
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-tour="savings-section">
           <div className="sidebar-section-label">Savings</div>
           <NavLink href="/piggybank" icon="fas fa-piggy-bank" label="Piggy Bank" />
         </div>
 
-        <div className="sidebar-section">
+        <div className="sidebar-section" data-tour="bank-section">
           <div className="sidebar-section-label">Bank</div>
           <NavLink href="/bank/accounts" icon="fas fa-university" label="Bank Account" />
         </div>
 
-        <Link href="/coach" className={`sidebar-coach${coachActive ? " active" : ""}`}>
+        <Link href="/coach" className={`sidebar-coach${coachActive ? " active" : ""}`} data-tour="coach">
           <i className="fas fa-robot" />
-          AI FAB Coach
+          FIN TRACKER Coach
         </Link>
       </nav>
 
       <div className="sidebar-footer">
-        <NavLink href="/settings" icon="fas fa-cog" label="Settings" />
+        <div data-tour="settings">
+          <NavLink href="/settings" icon="fas fa-cog" label="Settings" />
+        </div>
         {user && (
           <div className="sidebar-user">
             <div className="sidebar-avatar">{user.name?.charAt(0).toUpperCase()}</div>

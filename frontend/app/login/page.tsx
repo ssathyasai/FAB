@@ -208,12 +208,8 @@ export default function LoginPage() {
         <div className="login-logo">
           <i className="fas fa-coins" />
         </div>
-        <h1 className="login-title">AI FAB</h1>
+        <h1 className="login-title">FIN TRACKER</h1>
         <p className="login-subtitle">AI-Powered Financial Advisor & Budget Planner</p>
-        
-        <div className="sanskrit-quote">
-          <p>"Dhanam mulam idam jagath"</p>
-        </div>
 
         {mode !== "verify" && mode !== "login-verify" && mode !== "forgot-verify" && mode !== "forgot-reset" && (
           <div className="login-tabs">
@@ -476,7 +472,7 @@ export default function LoginPage() {
                     href="#" 
                     onClick={(e) => {
                       e.preventDefault();
-                      toast("Terms and Conditions: By using AI FAB, you agree to manage your finances responsibly. AI FAB provides guidance only and is not liable for financial decisions.", {
+                      toast("Terms and Conditions: By using FIN TRACKER, you agree to manage your finances responsibly. FIN TRACKER provides guidance only and is not liable for financial decisions.", {
                         duration: 6000,
                         icon: "📋"
                       });

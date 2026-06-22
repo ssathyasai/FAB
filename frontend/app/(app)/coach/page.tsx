@@ -82,7 +82,7 @@ export default function CoachPage() {
     <div className="page-enter" style={{ display: "flex", flexDirection: "column", height: "calc(100vh - 2rem)" }}>
       <PageHeader
         icon="fas fa-user-tie"
-        title="AI FAB Coach"
+        title="FIN TRACKER Coach"
         color="#6366f1"
         sub="Ask anything about budgeting, investing, or financial planning"
       >

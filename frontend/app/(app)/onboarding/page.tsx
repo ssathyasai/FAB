@@ -35,7 +35,7 @@ export default function OnboardingPage() {
         phone_number: data.phone_number || null,
         onboarding_complete: true,
       });
-      toast.success("Welcome to AI FAB! 🎉");
+      toast.success("Welcome to FIN TRACKER! 🎉");
       router.push("/budget/setup");
     } catch (err) {
       toast.error("Failed to save. Please try again.");
@@ -84,7 +84,7 @@ export default function OnboardingPage() {
             color: "#f5f0e8",
             marginBottom: "0.5rem"
           }}>
-            Welcome to AI FAB
+            Welcome to FIN TRACKER
           </h1>
           <p style={{ color: "rgba(240,180,41,0.5)", fontSize: "0.95rem" }}>
             AI-Powered Financial Advisor & Budget Planner

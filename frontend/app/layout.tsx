@@ -3,7 +3,7 @@ import "./globals.css";
 import { Toaster } from "react-hot-toast";
 
 export const metadata: Metadata = {
-  title: "AI FAB — AI-Powered Financial Advisor & Budget Planner",
+  title: "FIN TRACKER — AI-Powered Financial Advisor & Budget Planner",
   description: "AI-powered financial advisor and budget planner with transaction tracking, investment insights, and personalized recommendations",
 };
 

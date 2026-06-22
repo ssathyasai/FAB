@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getSettings, updateSettings } from "@/lib/api";
+import { requestProductTour, TOUR_STORAGE_KEY } from "@/lib/productTour";
 import { PageHeader } from "@/components/ui";
 import toast from "react-hot-toast";
 import { useRouter } from "next/navigation";
@@ -249,6 +250,27 @@ export default function Settings() {
               </button>
             ))}
           </div>
+        </div>
+
+        {/* Product Tour */}
+        <div className="card" style={{ padding:"1.5rem 1.75rem" }}>
+          <div className="section-title"><i className="fas fa-route" />Product Tour</div>
+          <p style={{ color:"var(--text3)",fontSize:"0.85rem",lineHeight:1.6,marginBottom:"1.2rem" }}>
+            Replay the guided walkthrough of AI FAB features
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem(TOUR_STORAGE_KEY);
+              updateSettings({ tour_complete: false }).catch(() => {});
+              requestProductTour();
+              toast.success("Starting product tour…");
+            }}
+            className="btn btn-secondary"
+            style={{ width:"100%" }}
+          >
+            <i className="fas fa-play-circle" /> Replay Product Tour
+          </button>
         </div>
 
         {/* Budget Setup */}

@@ -1,5 +1,6 @@
 "use client";
 import Sidebar from "@/components/Sidebar";
+import ProductTour from "@/components/ProductTour";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -25,7 +26,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="app-shell">
       <Sidebar />
-      <main className="app-main">{children}</main>
+      <main className="app-main" data-tour="main-content">{children}</main>
+      <ProductTour />
     </div>
   );
 }

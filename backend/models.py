@@ -122,6 +122,7 @@ class UserSettings(BaseModel):
     theme: str = "light"  # light / dark
     gemini_api_key: Optional[str] = None
     onboarding_complete: bool = False
+    tour_complete: bool = False
 
 
 class ChangePasswordRequest(BaseModel):

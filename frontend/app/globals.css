@@ -794,3 +794,59 @@ body {
   font-family: 'Inter', sans-serif !important;
   color: var(--text1) !important;
 }
+
+/* ── Product tour (driver.js) ── */
+.fab-tour-popover.driver-popover {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  color: var(--text1);
+  max-width: 320px;
+}
+
+.fab-tour-popover .driver-popover-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text1);
+}
+
+.fab-tour-popover .driver-popover-description {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: var(--text2);
+}
+
+.fab-tour-popover .driver-popover-progress-text {
+  font-size: 0.75rem;
+  color: var(--text3);
+}
+
+.fab-tour-popover .driver-popover-navigation-btns button {
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.45rem 0.85rem;
+  text-shadow: none;
+}
+
+.fab-tour-popover .driver-popover-next-btn,
+.fab-tour-popover .driver-popover-done-btn {
+  background: var(--accent) !important;
+  color: #fff !important;
+  border: none !important;
+}
+
+.fab-tour-popover .driver-popover-prev-btn {
+  background: var(--surface2) !important;
+  color: var(--text2) !important;
+  border: 1px solid var(--border) !important;
+}
+
+.fab-tour-popover .driver-popover-close-btn {
+  color: var(--text3);
+}
+
+.fab-tour-popover .driver-popover-close-btn:hover {
+  color: var(--text1);
+}
