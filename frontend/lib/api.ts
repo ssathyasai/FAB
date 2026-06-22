@@ -38,6 +38,8 @@ export const getTransactions = (params?: object) => api.get("/api/transactions/"
 export const getPendingTransactions = () => api.get("/api/transactions/pending");
 export const categorizeTransaction = (id: string, data: object) =>
   api.put(`/api/transactions/${id}/categorize`, data);
+export const splitCategorizeTransaction = (id: string, data: object) =>
+  api.put(`/api/transactions/${id}/split-categorize`, data);
 export const deleteTransaction = (id: string) => api.delete(`/api/transactions/${id}`);
 
 // ─── Budget ──────────────────────────────────────────────────────

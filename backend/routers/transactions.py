@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from database import get_db
-from models import CategorizeRequest, TransactionStatus
+from models import CategorizeRequest, TransactionStatus, SplitCategorizeRequest
 from utils import serialize_doc, serialize_docs, current_month
 from bson import ObjectId
 from datetime import datetime
@@ -96,6 +96,84 @@ async def categorize_transaction(tx_id: str, req: CategorizeRequest, current_use
 
     updated = await db.transactions.find_one({"_id": ObjectId(tx_id), "user_id": user_id})
     return serialize_doc(updated)
+
+
+@router.put("/{tx_id}/split-categorize")
+async def split_categorize_transaction(tx_id: str, req: SplitCategorizeRequest, current_user=Depends(get_current_user)):
+    db = get_db()
+    user_id = current_user["id"]
+    doc = await db.transactions.find_one({"_id": ObjectId(tx_id), "user_id": user_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+
+    # Validate that the sum of splits equals the original transaction amount
+    total_splits = sum(split.amount for split in req.splits)
+    if abs(total_splits - doc["amount"]) > 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Total split amount ({total_splits}) does not equal transaction amount ({doc['amount']})"
+        )
+
+    month = doc.get("month", current_month())
+    current_balance = doc["balance_before"]
+    inserted_ids = []
+
+    for split in req.splits:
+        if doc["transaction_type"] == "debit":
+            balance_after = current_balance - split.amount
+        else:
+            balance_after = current_balance + split.amount
+
+        parent_note = doc.get("note")
+        split_note = f"Split: {parent_note} - {split.note}" if (parent_note and split.note) else (split.note or parent_note or "Split transaction")
+
+        split_doc = {
+            "user_id": user_id,
+            "amount": split.amount,
+            "transaction_type": doc["transaction_type"],
+            "category_type": "expense",
+            "expense_category": split.expense_category,
+            "income_type": None,
+            "note": split_note,
+            "status": "categorized",
+            "balance_before": current_balance,
+            "balance_after": balance_after,
+            "created_at": datetime.utcnow(),
+            "month": month,
+        }
+
+        res = await db.transactions.insert_one(split_doc)
+        inserted_ids.append(str(res.inserted_id))
+
+        await db.budgets.update_one(
+            {"user_id": user_id, "month": month, "categories.name": split.expense_category},
+            {"$inc": {"categories.$.spent": split.amount}},
+        )
+
+        budget_doc = await db.budgets.find_one({"user_id": user_id, "month": month})
+        if budget_doc:
+            for cat in budget_doc.get("categories", []):
+                if cat["name"] == split.expense_category:
+                    spent = cat["spent"]
+                    allocated = cat["allocated"]
+                    pct = (spent / allocated * 100) if allocated > 0 else 0
+                    if pct >= 100:
+                        await _create_alert(db, user_id, month, "budget_exceeded", "critical",
+                            f"{split.expense_category} Budget Exceeded",
+                            f"{split.expense_category} budget exceeded by ₹{spent - allocated:,.0f}",
+                            split.expense_category)
+                    elif pct >= 80:
+                        await _create_alert(db, user_id, month, "budget_exceeded", "warning",
+                            f"{split.expense_category} at 80%",
+                            f"{split.expense_category} budget is {pct:.0f}% used",
+                            split.expense_category)
+
+        current_balance = balance_after
+
+    await db.transactions.delete_one({"_id": ObjectId(tx_id), "user_id": user_id})
+
+    created = await db.transactions.find({"_id": {"$in": [ObjectId(i) for i in inserted_ids]}}).to_list(length=100)
+    return {"success": True, "splits": serialize_docs(created)}
 
 
 async def _create_alert(db, user_id, month, alert_type, severity, title, message, category=None):

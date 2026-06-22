@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api, getTransactions, categorizeTransaction } from "@/lib/api";
+import { api, getTransactions, categorizeTransaction, splitCategorizeTransaction } from "@/lib/api";
 import { formatINR, formatDate, formatTime, EXPENSE_CATEGORIES, CATEGORY_ICONS } from "@/lib/utils";
 import { PageHeader, Loading, Empty } from "@/components/ui";
 import toast from "react-hot-toast";
@@ -33,6 +33,13 @@ export default function BankAccounts() {
     note: "",
     actual_price: "",
   });
+
+  // Split Transactions State
+  const [isSplitting, setIsSplitting] = useState(false);
+  const [splits, setSplits] = useState<any[]>([
+    { expense_category: "", amount: "", note: "" },
+    { expense_category: "", amount: "", note: "" },
+  ]);
 
   const loadBalance = async () => {
     try {
@@ -95,6 +102,11 @@ export default function BankAccounts() {
 
   const openModal = (tx: any) => {
     setModal(tx);
+    setIsSplitting(false);
+    setSplits([
+      { expense_category: "", amount: "", note: "" },
+      { expense_category: "", amount: "", note: "" },
+    ]);
     setForm({
       category_type: tx.category_type === "uncategorized" ? "expense" : tx.category_type,
       expense_category: tx.expense_category || "",
@@ -161,6 +173,61 @@ export default function BankAccounts() {
     if (tx.income_type) return tx.income_type;
     if (tx.status === "pending") return "Needs Categorization";
     return "Uncategorized";
+  };
+
+  // Splits helper functions
+  const splitTotal = splits.reduce((sum, s) => sum + (parseFloat(s.amount) || 0), 0);
+  const remainingAmount = modal ? modal.amount - splitTotal : 0;
+
+  const updateSplit = (index: number, key: string, value: any) => {
+    const nextSplits = [...splits];
+    nextSplits[index] = { ...nextSplits[index], [key]: value };
+    setSplits(nextSplits);
+  };
+
+  const addSplitRow = () => {
+    setSplits([...splits, { expense_category: "", amount: "", note: "" }]);
+  };
+
+  const removeSplitRow = (index: number) => {
+    if (splits.length <= 2) return;
+    setSplits(splits.filter((_, i) => i !== index));
+  };
+
+  const saveSplits = async () => {
+    if (Math.abs(remainingAmount) > 0.01) {
+      toast.error(`Allocated amounts must sum to exactly ${formatINR(modal.amount)}`);
+      return;
+    }
+
+    for (let i = 0; i < splits.length; i++) {
+      const s = splits[i];
+      const amt = parseFloat(s.amount);
+      if (!s.expense_category) {
+        toast.error(`Please select a category for row ${i + 1}`);
+        return;
+      }
+      if (isNaN(amt) || amt <= 0) {
+        toast.error(`Please enter a valid amount for row ${i + 1}`);
+        return;
+      }
+    }
+
+    try {
+      const payload = {
+        splits: splits.map((s) => ({
+          expense_category: s.expense_category,
+          amount: parseFloat(s.amount),
+          note: s.note || undefined,
+        })),
+      };
+      await splitCategorizeTransaction(modal.id, payload);
+      toast.success("✅ Transaction split and categorized!");
+      setModal(null);
+      loadAll();
+    } catch (error: any) {
+      toast.error(error?.response?.data?.detail || "Failed to split transaction");
+    }
   };
 
   if (loading) return <Loading text="Loading bank account..." />;
@@ -664,7 +731,7 @@ export default function BankAccounts() {
                   <i className="fas fa-tag" style={{ color: "#3b82f6", marginRight: "0.5rem" }} />
                   Categorize Transaction
                 </h2>
-                <p style={{ color: "var(--text3)", fontSize: "0.85rem" }}>Assign a category to track this expense</p>
+                <p style={{ color: "var(--text3)", fontSize: "0.85rem" }}>Assign category to track this expense</p>
               </div>
               <button
                 onClick={() => setModal(null)}
@@ -720,91 +787,242 @@ export default function BankAccounts() {
               </span>
             </div>
 
-            <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
-              {/* Type */}
-              <div>
-                <label className="label">Transaction Type</label>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.6rem" }}>
-                  {TX_TYPES.map((t) => (
-                    <button
-                      key={t}
-                      onClick={() => setForm((f) => ({ ...f, category_type: t }))}
-                      style={{
-                        padding: "0.8rem 0.5rem",
-                        borderRadius: 10,
-                        border: `2px solid ${form.category_type === t ? "#3b82f6" : "rgba(255,255,255,0.08)"}`,
-                        background: form.category_type === t ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.02)",
-                        color: form.category_type === t ? "#3b82f6" : "var(--text3)",
-                        cursor: "pointer",
-                        fontSize: "0.8rem",
-                        fontWeight: 600,
-                        fontFamily: "Inter",
-                        textTransform: "capitalize",
-                        transition: "all 0.2s",
-                      }}
+            {/* Mode Selector Tabs (only for debit) */}
+            {modal.transaction_type === "debit" && (
+              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", background: "rgba(255,255,255,0.03)", padding: 4, borderRadius: 8 }}>
+                <button
+                  onClick={() => setIsSplitting(false)}
+                  style={{
+                    flex: 1,
+                    padding: "0.5rem",
+                    borderRadius: 6,
+                    border: "none",
+                    background: !isSplitting ? "rgba(59,130,246,0.15)" : "transparent",
+                    color: !isSplitting ? "#3b82f6" : "var(--text3)",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Single Category
+                </button>
+                <button
+                  onClick={() => setIsSplitting(true)}
+                  style={{
+                    flex: 1,
+                    padding: "0.5rem",
+                    borderRadius: 6,
+                    border: "none",
+                    background: isSplitting ? "rgba(59,130,246,0.15)" : "transparent",
+                    color: isSplitting ? "#3b82f6" : "var(--text3)",
+                    fontWeight: 600,
+                    fontSize: "0.8rem",
+                    cursor: "pointer",
+                  }}
+                >
+                  Split Categories
+                </button>
+              </div>
+            )}
+
+            {!isSplitting ? (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+                {/* Type */}
+                <div>
+                  <label className="label">Transaction Type</label>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.6rem" }}>
+                    {TX_TYPES.map((t) => (
+                      <button
+                        key={t}
+                        onClick={() => setForm((f) => ({ ...f, category_type: t }))}
+                        style={{
+                          padding: "0.8rem 0.5rem",
+                          borderRadius: 10,
+                          border: `2px solid ${form.category_type === t ? "#3b82f6" : "rgba(255,255,255,0.08)"}`,
+                          background: form.category_type === t ? "rgba(59,130,246,0.12)" : "rgba(255,255,255,0.02)",
+                          color: form.category_type === t ? "#3b82f6" : "var(--text3)",
+                          cursor: "pointer",
+                          fontSize: "0.8rem",
+                          fontWeight: 600,
+                          fontFamily: "Inter",
+                          textTransform: "capitalize",
+                          transition: "all 0.2s",
+                        }}
+                      >
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Category */}
+                {form.category_type === "expense" && (
+                  <div>
+                    <label className="label">Expense Category</label>
+                    <select
+                      className="input"
+                      value={form.expense_category}
+                      onChange={(e) => setForm((f) => ({ ...f, expense_category: e.target.value }))}
                     >
-                      {t}
-                    </button>
+                      <option value="">Select category...</option>
+                      {EXPENSE_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>
+                          {CATEGORY_ICONS[c]} {c}
+                        </option>
+                      ))}
+                    </select>
+                    {form.expense_category && (
+                      <div style={{ fontSize: "0.75rem", color: "#3b82f6", marginTop: 6 }}>
+                        ✅ Will update your <strong>{form.expense_category}</strong> budget
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {form.category_type === "income" && (
+                  <div>
+                    <label className="label">Income Source</label>
+                    <select
+                      className="input"
+                      value={form.income_type}
+                      onChange={(e) => setForm((f) => ({ ...f, income_type: e.target.value }))}
+                    >
+                      <option value="">Select source...</option>
+                      {INCOME_TYPES.map((t) => (
+                        <option key={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                <div>
+                  <label className="label">
+                    Note <span style={{ color: "var(--text4)", textTransform: "none", fontWeight: 400 }}>(optional)</span>
+                  </label>
+                  <input
+                    className="input"
+                    placeholder="e.g., Zomato order, Electricity bill..."
+                    value={form.note}
+                    onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
+                  />
+                </div>
+
+                <button onClick={save} className="btn-primary" style={{ width: "100%" }}>
+                  <i className="fas fa-check" /> Save & Categorize
+                </button>
+              </div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "1.2rem" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span style={{ fontSize: "0.85rem", fontWeight: 600, color: "var(--text2)" }}>Splits List</span>
+                  <button
+                    onClick={addSplitRow}
+                    className="btn-secondary"
+                    style={{ padding: "0.4rem 0.8rem", fontSize: "0.75rem", width: "auto" }}
+                  >
+                    <i className="fas fa-plus" /> Add Row
+                  </button>
+                </div>
+
+                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem", maxHeight: "250px", overflowY: "auto", paddingRight: "4px" }}>
+                  {splits.map((s, index) => (
+                    <div key={index} style={{ display: "flex", gap: "0.6rem", alignItems: "center", background: "rgba(255,255,255,0.02)", padding: "0.8rem", borderRadius: 8, border: "1px solid rgba(255,255,255,0.05)" }}>
+                      <span style={{ fontSize: "0.8rem", fontWeight: 700, color: "var(--text3)" }}>#{index + 1}</span>
+                      
+                      <div style={{ flex: 1.5, minWidth: 0 }}>
+                        <select
+                          className="input"
+                          style={{ padding: "0.5rem", fontSize: "0.8rem", marginBottom: 0 }}
+                          value={s.expense_category}
+                          onChange={(e) => updateSplit(index, "expense_category", e.target.value)}
+                        >
+                          <option value="">Category...</option>
+                          {EXPENSE_CATEGORIES.map((c) => (
+                            <option key={c} value={c}>
+                              {CATEGORY_ICONS[c]} {c}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div style={{ flex: 1.5, minWidth: 0 }}>
+                        <input
+                          type="text"
+                          className="input"
+                          placeholder="Note (optional)..."
+                          style={{ padding: "0.5rem", fontSize: "0.8rem", marginBottom: 0 }}
+                          value={s.note}
+                          onChange={(e) => updateSplit(index, "note", e.target.value)}
+                        />
+                      </div>
+
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <input
+                          type="number"
+                          className="input"
+                          placeholder="Amount..."
+                          style={{ padding: "0.5rem", fontSize: "0.8rem", marginBottom: 0, textAlign: "right" }}
+                          value={s.amount}
+                          onChange={(e) => updateSplit(index, "amount", e.target.value)}
+                        />
+                      </div>
+
+                      {splits.length > 2 && (
+                        <button
+                          onClick={() => removeSplitRow(index)}
+                          style={{
+                            background: "rgba(239,68,68,0.1)",
+                            border: "none",
+                            color: "#ef4444",
+                            width: 28,
+                            height: 28,
+                            borderRadius: 6,
+                            cursor: "pointer",
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            fontSize: "0.8rem"
+                          }}
+                        >
+                          <i className="fas fa-trash" />
+                        </button>
+                      )}
+                    </div>
                   ))}
                 </div>
-              </div>
 
-              {/* Category */}
-              {form.category_type === "expense" && (
-                <div>
-                  <label className="label">Expense Category</label>
-                  <select
-                    className="input"
-                    value={form.expense_category}
-                    onChange={(e) => setForm((f) => ({ ...f, expense_category: e.target.value }))}
-                  >
-                    <option value="">Select category...</option>
-                    {EXPENSE_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {CATEGORY_ICONS[c]} {c}
-                      </option>
-                    ))}
-                  </select>
-                  {form.expense_category && (
-                    <div style={{ fontSize: "0.75rem", color: "#3b82f6", marginTop: 6 }}>
-                      ✅ Will update your <strong>{form.expense_category}</strong> budget
+                {/* Split summary and validation indicator */}
+                <div style={{
+                  padding: "0.8rem 1rem",
+                  borderRadius: 8,
+                  background: remainingAmount === 0 ? "rgba(16,185,129,0.08)" : "rgba(245,158,11,0.08)",
+                  border: `1px solid ${remainingAmount === 0 ? "rgba(16,185,129,0.15)" : "rgba(245,158,11,0.15)"}`,
+                  fontSize: "0.85rem",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}>
+                  <div>
+                    <div style={{ color: "var(--text3)" }}>Total Split: <strong style={{ color: "var(--text1)" }}>{formatINR(splitTotal)}</strong></div>
+                    <div style={{ fontSize: "0.75rem", color: remainingAmount === 0 ? "#10b981" : "#f59e0b", marginTop: 2 }}>
+                      {remainingAmount === 0 ? "✅ Perfect match!" : remainingAmount > 0 ? `⚠️ ₹${formatINR(remainingAmount).replace("₹", "")} left to allocate` : `⚠️ Overallocated by ₹${formatINR(Math.abs(remainingAmount)).replace("₹", "")}`}
                     </div>
-                  )}
+                  </div>
+                  <span style={{ fontSize: "1.1rem", fontWeight: 800, color: remainingAmount === 0 ? "#10b981" : "#f59e0b" }}>
+                    {remainingAmount === 0 ? <i className="fas fa-check-circle" /> : <i className="fas fa-exclamation-circle" />}
+                  </span>
                 </div>
-              )}
 
-              {form.category_type === "income" && (
-                <div>
-                  <label className="label">Income Source</label>
-                  <select
-                    className="input"
-                    value={form.income_type}
-                    onChange={(e) => setForm((f) => ({ ...f, income_type: e.target.value }))}
-                  >
-                    <option value="">Select source...</option>
-                    {INCOME_TYPES.map((t) => (
-                      <option key={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <div>
-                <label className="label">
-                  Note <span style={{ color: "var(--text4)", textTransform: "none", fontWeight: 400 }}>(optional)</span>
-                </label>
-                <input
-                  className="input"
-                  placeholder="e.g., Zomato order, Electricity bill..."
-                  value={form.note}
-                  onChange={(e) => setForm((f) => ({ ...f, note: e.target.value }))}
-                />
+                <button
+                  onClick={saveSplits}
+                  className="btn-primary"
+                  disabled={remainingAmount !== 0}
+                  style={{ width: "100%", marginTop: 4, opacity: remainingAmount !== 0 ? 0.6 : 1, cursor: remainingAmount !== 0 ? "not-allowed" : "pointer" }}
+                >
+                  <i className="fas fa-check" /> Save Splits
+                </button>
               </div>
-
-              <button onClick={save} className="btn-primary" style={{ width: "100%" }}>
-                <i className="fas fa-check" /> Save & Categorize
-              </button>
-            </div>
+            )}
           </div>
         </div>
       )}

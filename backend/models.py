@@ -62,6 +62,16 @@ class CategorizeRequest(BaseModel):
     note: Optional[str] = None
 
 
+class SplitItem(BaseModel):
+    expense_category: str
+    amount: float
+    note: Optional[str] = None
+
+
+class SplitCategorizeRequest(BaseModel):
+    splits: List[SplitItem]
+
+
 # ─── Budget Models ───────────────────────────────────────────────
 
 class BudgetCategory(BaseModel):
