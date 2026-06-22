@@ -208,7 +208,7 @@ async def analyze_receipt(image_bytes: bytes, mime_type: str = "image/jpeg") -> 
     providers = _get_provider_config()
     
     if not providers:
-        raise ValueError("No AI provider configured. Add GEMINI_API_KEY or OPENAI_API_KEY.")
+        raise ValueError("No AI provider configured. Add GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY.")
         
     import base64
     base64_image = base64.b64encode(image_bytes).decode('utf-8')
@@ -228,7 +228,38 @@ Ensure "amount" is a float, "category" and "note" are strings. Do not include ma
     
     for provider in providers:
         try:
-            if provider["name"] == "gemini":
+            if provider["name"] == "groq":
+                from groq import Groq
+                client = Groq(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+                
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.chat.completions.create(
+                        model="llama-3.2-11b-vision-preview",
+                        messages=messages,
+                        max_tokens=300,
+                        temperature=0.0
+                    )
+                )
+                return _parse_json(response.choices[0].message.content)
+
+            elif provider["name"] == "gemini":
                 from google import genai
                 from google.genai import types
                 client = genai.Client(api_key=provider["key"])
@@ -281,8 +312,8 @@ Ensure "amount" is a float, "category" and "note" are strings. Do not include ma
             continue
             
     if last_error:
-        raise ValueError(f"Receipt analysis failed. (Note: Ensure GEMINI or OPENAI keys are valid). Last Error: {last_error}")
-    raise ValueError("No vision-capable AI provider configured. Add GEMINI_API_KEY or OPENAI_API_KEY.")
+        raise ValueError(f"Receipt analysis failed. (Note: Ensure GROQ, GEMINI or OPENAI keys are valid). Last Error: {last_error}")
+    raise ValueError("No vision-capable AI provider configured. Add GROQ_API_KEY, GEMINI_API_KEY or OPENAI_API_KEY.")
 
 # ─── High-Level Functions (for backward compatibility) ──────────
 
