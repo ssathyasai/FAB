@@ -90,25 +90,14 @@ def generate_otp() -> str:
     return ''.join(random.choices(string.digits, k=6))
 
 
-async def send_otp_email(email: str, otp: str, name: str = "User"):
-    """Send OTP via email. Falls back to console print if SMTP not configured."""
+async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool, str]:
+    """Send OTP via email. Supports Resend API (HTTP) and standard SMTP."""
     import asyncio
     
     # Always print OTP to console as backup
-    print(f"[OTP] 📋 Backup OTP for {email}: {otp}")
+    print(f"[OTP] [BACKUP] Backup OTP for {email}: {otp}")
     
-    try:
-        if not SMTP_EMAIL or not SMTP_PASSWORD:
-            print(f"[OTP] ✉️ Email not configured. Using console OTP only.")
-            return True
-
-        # Create email message
-        msg = MIMEMultipart()
-        msg['From'] = SMTP_EMAIL
-        msg['To'] = email
-        msg['Subject'] = "AI FAB – Email Verification Code"
-
-        body = f"""
+    body = f"""
 <html>
 <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
     <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
@@ -139,6 +128,58 @@ async def send_otp_email(email: str, otp: str, name: str = "User"):
 </html>
 """
 
+    try:
+        # 1. Try sending via Resend API if configured
+        resend_key = os.getenv("RESEND_API_KEY", "")
+        if resend_key:
+            import httpx
+            from_email = os.getenv("RESEND_FROM_EMAIL", "AI FAB <onboarding@resend.dev>")
+            print(f"[OTP] [STATUS] Sending via Resend API to {email} using sender '{from_email}'...")
+            try:
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(
+                        "https://api.resend.com/emails",
+                        headers={
+                            "Authorization": f"Bearer {resend_key}",
+                            "Content-Type": "application/json",
+                        },
+                        json={
+                            "from": from_email,
+                            "to": [email],
+                            "subject": "AI FAB – Email Verification Code",
+                            "html": body,
+                        },
+                        timeout=15.0
+                    )
+                    if res.status_code in (200, 201):
+                        print(f"[OTP] [SUCCESS] Email sent successfully via Resend to {email}")
+                        return True, "Email sent successfully via Resend API"
+                    else:
+                        err_detail = res.text
+                        try:
+                            err_json = res.json()
+                            if "message" in err_json:
+                                err_detail = err_json["message"]
+                        except:
+                            pass
+                        err_msg = f"Resend API Error ({res.status_code}): {err_detail}"
+                        print(f"[OTP] [ERROR] {err_msg}")
+                        return False, err_msg
+            except Exception as e:
+                err_msg = f"Resend connection failed: {str(e)}"
+                print(f"[OTP] [ERROR] {err_msg}")
+                return False, err_msg
+
+        # 2. Fall back to SMTP
+        if not SMTP_EMAIL or not SMTP_PASSWORD:
+            print(f"[OTP] [EMAIL] Email not configured (no RESEND_API_KEY and SMTP_EMAIL/SMTP_PASSWORD is missing). Using console OTP only.")
+            return True, "Email not configured, bypassed using console backup."
+
+        # Create email message for SMTP
+        msg = MIMEMultipart()
+        msg['From'] = SMTP_EMAIL
+        msg['To'] = email
+        msg['Subject'] = "AI FAB – Email Verification Code"
         msg.attach(MIMEText(body, 'html'))
 
         # Send email synchronously with timeout
@@ -151,43 +192,46 @@ async def send_otp_email(email: str, otp: str, name: str = "User"):
                 ),
                 timeout=15.0  # 15 second timeout
             )
-            print(f"[OTP] ✅ Email sent successfully to {email}")
-            return True
+            print(f"[OTP] [SUCCESS] Email sent successfully to {email}")
+            return True, "Email sent successfully via SMTP"
             
         except asyncio.TimeoutError:
-            print(f"[OTP] ⏱️ Timeout sending email to {email}")
-            return False
+            err_msg = f"SMTP Connection Timeout: Connecting to {SMTP_SERVER}:{SMTP_PORT} timed out. Outbound SMTP ports might be blocked by your hosting provider (e.g. Render Free Tier blocks SMTP). Please configure RESEND_API_KEY."
+            print(f"[OTP] [TIMEOUT] {err_msg}")
+            return False, err_msg
         except Exception as e:
-            print(f"[OTP] ❌ Failed to send email: {str(e)}")
+            err_msg = f"SMTP Failed: {str(e)}"
+            print(f"[OTP] [ERROR] SMTP Failed: {str(e)}")
             import traceback
             traceback.print_exc()
-            return False
+            return False, err_msg
         
     except Exception as e:
-        print(f"[OTP] ❌ Error in send_otp_email: {str(e)}")
+        err_msg = f"Unexpected email module error: {str(e)}"
+        print(f"[OTP] [ERROR] Unexpected email module error: {str(e)}")
         import traceback
         traceback.print_exc()
-        return True  # Don't block registration if email fails
+        return False, err_msg
 
 
 def _send_smtp(msg, email, otp):
     """Synchronous SMTP send helper"""
     try:
-        print(f"[OTP] 🔄 Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
+        print(f"[OTP] [STATUS] Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
         with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
-            print(f"[OTP] 🔄 Starting TLS...")
+            print(f"[OTP] [STATUS] Starting TLS...")
             server.starttls()
-            print(f"[OTP] 🔄 Logging in as {SMTP_EMAIL}...")
+            print(f"[OTP] [STATUS] Logging in as {SMTP_EMAIL}...")
             server.login(SMTP_EMAIL, SMTP_PASSWORD)
-            print(f"[OTP] 🔄 Sending email to {email}...")
+            print(f"[OTP] [STATUS] Sending email to {email}...")
             server.send_message(msg)
-            print(f"[OTP] ✅ SMTP send_message completed for {email}")
+            print(f"[OTP] [SUCCESS] SMTP send_message completed for {email}")
     except smtplib.SMTPAuthenticationError as e:
-        print(f"[OTP] ❌ SMTP Authentication Error: {e}")
-        print(f"[OTP] 💡 Check your app password at https://myaccount.google.com/apppasswords")
+        print(f"[OTP] [ERROR] SMTP Authentication Error: {e}")
+        print(f"[OTP] [TIP] Check your app password at https://myaccount.google.com/apppasswords")
         raise
     except Exception as e:
-        print(f"[OTP] ❌ SMTP Error: {e}")
+        print(f"[OTP] [ERROR] SMTP Error: {e}")
         raise
 
 
@@ -247,7 +291,9 @@ async def register(req: RegisterRequest):
     )
 
     # Send OTP email (falls back to console if SMTP not configured)
-    await send_otp_email(req.email, otp, req.name.strip())
+    success, err_msg = await send_otp_email(req.email, otp, req.name.strip())
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to send verification code: {err_msg}")
 
     return {"status": "otp_sent", "message": "Verification code sent to your email"}
 
@@ -321,7 +367,9 @@ async def resend_otp(req: ResendOTPRequest):
         {"$set": {"otp": otp, "otp_expiry": otp_expiry}},
     )
 
-    await send_otp_email(req.email, otp, pending.get("name", "User"))
+    success, err_msg = await send_otp_email(req.email, otp, pending.get("name", "User"))
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to resend verification code: {err_msg}")
 
     return {"status": "otp_sent", "message": "New verification code sent to your email"}
 
@@ -360,7 +408,9 @@ async def login(req: LoginRequest):
     )
     
     # Send OTP email
-    await send_otp_email(req.email, otp, user.get("name", "User"))
+    success, err_msg = await send_otp_email(req.email, otp, user.get("name", "User"))
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to send verification code: {err_msg}")
     
     return {"status": "otp_sent", "message": "Verification code sent to your email"}
 
@@ -423,7 +473,9 @@ async def login_resend(req: ResendOTPRequest):
         upsert=True,
     )
     
-    await send_otp_email(req.email, otp, user.get("name", "User"))
+    success, err_msg = await send_otp_email(req.email, otp, user.get("name", "User"))
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to resend verification code: {err_msg}")
     
     return {"status": "otp_sent", "message": "New verification code sent to your email"}
 
@@ -460,7 +512,9 @@ async def forgot_password(req: ResendOTPRequest):
     )
     
     # Send OTP email
-    await send_otp_email(req.email, otp, user.get("name", "User"))
+    success, err_msg = await send_otp_email(req.email, otp, user.get("name", "User"))
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to send password reset code: {err_msg}")
     
     return {"status": "otp_sent", "message": "Password reset code sent to your email"}
 
@@ -581,7 +635,9 @@ async def forgot_password_resend(req: ResendOTPRequest):
         upsert=True,
     )
     
-    await send_otp_email(req.email, otp, user.get("name", "User"))
+    success, err_msg = await send_otp_email(req.email, otp, user.get("name", "User"))
+    if not success:
+        raise HTTPException(status_code=500, detail=f"Failed to resend password reset code: {err_msg}")
     
     return {"status": "otp_sent", "message": "New password reset code sent to your email"}
 
@@ -593,12 +649,15 @@ async def me(current_user=Depends(get_current_user)):
 
 @router.get("/health-check")
 async def health_check():
-    """Health check endpoint to verify SMTP configuration (doesn't expose password)"""
+    """Health check endpoint to verify SMTP and Resend configuration (doesn't expose keys/passwords)"""
+    resend_key = os.getenv("RESEND_API_KEY", "")
     return {
         "status": "ok",
+        "resend_configured": bool(resend_key),
+        "resend_from_email": os.getenv("RESEND_FROM_EMAIL", "AI FAB <onboarding@resend.dev>") if resend_key else "not configured",
         "smtp_configured": bool(SMTP_EMAIL and SMTP_PASSWORD),
         "smtp_email": SMTP_EMAIL if SMTP_EMAIL else "not configured",
         "smtp_server": SMTP_SERVER,
         "smtp_port": SMTP_PORT,
-        "password_length": len(SMTP_PASSWORD) if SMTP_PASSWORD else 0
+        "smtp_password_length": len(SMTP_PASSWORD) if SMTP_PASSWORD else 0
     }
