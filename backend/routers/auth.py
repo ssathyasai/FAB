@@ -138,17 +138,11 @@ def _send_via_resend(to_email: str, subject: str, html: str) -> None:
 
 
 def _send_smtp(to_email: str, subject: str, html: str) -> None:
-    from_addr = _format_from_address()
-    if not from_addr:
-        raise ValueError("No sender address configured for SMTP")
-
     msg = MIMEMultipart()
-    msg["From"] = from_addr
+    msg["From"] = SMTP_EMAIL
     msg["To"] = to_email
     msg["Subject"] = subject
     msg.attach(MIMEText(html, "html"))
-
-    envelope_from = (SENDER_EMAIL or SMTP_EMAIL).strip()
 
     print(f"[OTP] [STATUS] Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
     with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=15) as server:
@@ -156,8 +150,8 @@ def _send_smtp(to_email: str, subject: str, html: str) -> None:
         server.starttls()
         print(f"[OTP] [STATUS] Logging in as {SMTP_EMAIL}...")
         server.login(SMTP_EMAIL, SMTP_PASSWORD)
-        print(f"[OTP] [STATUS] Sending email to {to_email} from {envelope_from}...")
-        server.sendmail(envelope_from, [to_email], msg.as_string())
+        print(f"[OTP] [STATUS] Sending email to {to_email}...")
+        server.send_message(msg)
         print(f"[OTP] [SUCCESS] SMTP send completed for {to_email}")
 
 
