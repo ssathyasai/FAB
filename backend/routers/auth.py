@@ -91,95 +91,104 @@ def generate_otp() -> str:
 
 
 async def send_otp_email(email: str, otp: str, name: str = "User"):
-    """Send OTP via email asynchronously. Falls back to console print if SMTP not configured."""
+    """Send OTP via email. Falls back to console print if SMTP not configured."""
     import asyncio
+    
+    # Always print OTP to console as backup
+    print(f"[OTP] 📋 Backup OTP for {email}: {otp}")
     
     try:
         if not SMTP_EMAIL or not SMTP_PASSWORD:
-            print(f"[OTP] ✉️ Email not configured. OTP for {email}: {otp}")
+            print(f"[OTP] ✉️ Email not configured. Using console OTP only.")
             return True
 
-        # Run email sending in background to not block API response
-        async def send_email_task():
-            try:
-                msg = MIMEMultipart()
-                msg['From'] = SMTP_EMAIL
-                msg['To'] = email
-                msg['Subject'] = "AI FAB – Email Verification Code"
+        # Create email message
+        msg = MIMEMultipart()
+        msg['From'] = SMTP_EMAIL
+        msg['To'] = email
+        msg['Subject'] = "AI FAB – Email Verification Code"
 
-                body = f"""
-        <html>
-        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
-            <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
-                <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 AI FAB</h1>
-                <p style="color: rgba(255,255,255,0.8); margin-top: 8px; font-size:14px;">AI-Powered Financial Advisor & Budget Planner</p>
-            </div>
+        body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background:#f4f4f5;">
+    <div style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); padding: 32px; border-radius: 16px; text-align: center;">
+        <h1 style="color: white; margin: 0; font-size:28px; letter-spacing:-0.5px;">💰 AI FAB</h1>
+        <p style="color: rgba(255,255,255,0.8); margin-top: 8px; font-size:14px;">AI-Powered Financial Advisor & Budget Planner</p>
+    </div>
 
-            <div style="padding: 32px; background: #ffffff; border-radius: 16px; margin-top: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
-                <h2 style="color: #09090b; margin:0 0 8px;">Hi {name} 👋</h2>
-                <p style="color: #71717a; font-size: 15px; line-height:1.6;">
-                    Welcome to AI FAB! Please use the code below to verify your email address.
-                    This code is valid for <strong>10 minutes</strong>.
-                </p>
+    <div style="padding: 32px; background: #ffffff; border-radius: 16px; margin-top: 16px; box-shadow: 0 4px 24px rgba(0,0,0,0.06);">
+        <h2 style="color: #09090b; margin:0 0 8px;">Hi {name} 👋</h2>
+        <p style="color: #71717a; font-size: 15px; line-height:1.6;">
+            Welcome to AI FAB! Please use the code below to verify your email address.
+            This code is valid for <strong>10 minutes</strong>.
+        </p>
 
-                <div style="background: #f4f4f5; padding: 28px; border-radius: 12px; text-align: center; margin: 28px 0;">
-                    <p style="color: #71717a; font-size: 12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin:0 0 12px;">Your verification code</p>
-                    <h1 style="color: #6366f1; font-size: 52px; letter-spacing: 14px; margin: 0; font-weight:800;">{otp}</h1>
-                    <p style="color: #a1a1aa; font-size: 12px; margin-top: 12px;">Do not share this code with anyone</p>
-                </div>
+        <div style="background: #f4f4f5; padding: 28px; border-radius: 12px; text-align: center; margin: 28px 0;">
+            <p style="color: #71717a; font-size: 12px; font-weight:600; text-transform:uppercase; letter-spacing:1px; margin:0 0 12px;">Your verification code</p>
+            <h1 style="color: #6366f1; font-size: 52px; letter-spacing: 14px; margin: 0; font-weight:800;">{otp}</h1>
+            <p style="color: #a1a1aa; font-size: 12px; margin-top: 12px;">Do not share this code with anyone</p>
+        </div>
 
-                <p style="color: #a1a1aa; font-size: 13px;">If you didn't create an AI FAB account, you can safely ignore this email.</p>
-            </div>
+        <p style="color: #a1a1aa; font-size: 13px;">If you didn't create an AI FAB account, you can safely ignore this email.</p>
+    </div>
 
-            <div style="text-align: center; margin-top: 20px; color: #a1a1aa; font-size: 12px;">
-                <p>© 2026 AI FAB. All rights reserved.</p>
-            </div>
-        </body>
-        </html>
-        """
+    <div style="text-align: center; margin-top: 20px; color: #a1a1aa; font-size: 12px;">
+        <p>© 2026 AI FAB. All rights reserved.</p>
+    </div>
+</body>
+</html>
+"""
 
-                msg.attach(MIMEText(body, 'html'))
+        msg.attach(MIMEText(body, 'html'))
 
-                # Use asyncio to run SMTP in executor with timeout
-                loop = asyncio.get_event_loop()
-                await asyncio.wait_for(
-                    loop.run_in_executor(
-                        None,
-                        lambda: _send_smtp(msg)
-                    ),
-                    timeout=10.0  # 10 second timeout
-                )
-                
-                print(f"[OTP] ✅ Email sent successfully to {email}")
-                return True
-                
-            except asyncio.TimeoutError:
-                print(f"[OTP] ⏱️ Timeout sending email to {email}. OTP: {otp}")
-                return False
-            except Exception as e:
-                print(f"[OTP] ❌ Failed to send email: {str(e)}")
-                print(f"[OTP] 📋 Console OTP for {email}: {otp}")
-                return False
-        
-        # Start email task in background (fire and forget)
-        asyncio.create_task(send_email_task())
-        
-        # Always print OTP to console as backup
-        print(f"[OTP] 📋 Backup OTP for {email}: {otp}")
-        return True
+        # Send email synchronously with timeout
+        loop = asyncio.get_event_loop()
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: _send_smtp(msg, email, otp)
+                ),
+                timeout=15.0  # 15 second timeout
+            )
+            print(f"[OTP] ✅ Email sent successfully to {email}")
+            return True
+            
+        except asyncio.TimeoutError:
+            print(f"[OTP] ⏱️ Timeout sending email to {email}")
+            return False
+        except Exception as e:
+            print(f"[OTP] ❌ Failed to send email: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return False
         
     except Exception as e:
         print(f"[OTP] ❌ Error in send_otp_email: {str(e)}")
-        print(f"[OTP] 📋 Console OTP for {email}: {otp}")
+        import traceback
+        traceback.print_exc()
         return True  # Don't block registration if email fails
 
 
-def _send_smtp(msg):
+def _send_smtp(msg, email, otp):
     """Synchronous SMTP send helper"""
-    with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
-        server.starttls()
-        server.login(SMTP_EMAIL, SMTP_PASSWORD)
-        server.send_message(msg)
+    try:
+        print(f"[OTP] 🔄 Connecting to {SMTP_SERVER}:{SMTP_PORT}...")
+        with smtplib.SMTP(SMTP_SERVER, SMTP_PORT, timeout=10) as server:
+            print(f"[OTP] 🔄 Starting TLS...")
+            server.starttls()
+            print(f"[OTP] 🔄 Logging in as {SMTP_EMAIL}...")
+            server.login(SMTP_EMAIL, SMTP_PASSWORD)
+            print(f"[OTP] 🔄 Sending email to {email}...")
+            server.send_message(msg)
+            print(f"[OTP] ✅ SMTP send_message completed for {email}")
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"[OTP] ❌ SMTP Authentication Error: {e}")
+        print(f"[OTP] 💡 Check your app password at https://myaccount.google.com/apppasswords")
+        raise
+    except Exception as e:
+        print(f"[OTP] ❌ SMTP Error: {e}")
+        raise
 
 
 async def get_current_user(
@@ -580,3 +589,16 @@ async def forgot_password_resend(req: ResendOTPRequest):
 @router.get("/me")
 async def me(current_user=Depends(get_current_user)):
     return {"user": {k: v for k, v in current_user.items() if k != "password"}}
+
+
+@router.get("/health-check")
+async def health_check():
+    """Health check endpoint to verify SMTP configuration (doesn't expose password)"""
+    return {
+        "status": "ok",
+        "smtp_configured": bool(SMTP_EMAIL and SMTP_PASSWORD),
+        "smtp_email": SMTP_EMAIL if SMTP_EMAIL else "not configured",
+        "smtp_server": SMTP_SERVER,
+        "smtp_port": SMTP_PORT,
+        "password_length": len(SMTP_PASSWORD) if SMTP_PASSWORD else 0
+    }
