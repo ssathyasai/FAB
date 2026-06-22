@@ -46,6 +46,17 @@ SMTP_SERVER = os.getenv("SMTP_SERVER", "smtp.gmail.com")
 SMTP_PORT = int(os.getenv("SMTP_PORT", "587"))
 SMTP_EMAIL = os.getenv("SMTP_EMAIL", "")
 SMTP_PASSWORD = os.getenv("SMTP_PASSWORD", "")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
+
+# Mailgun - 100 emails/day FREE forever!
+MAILGUN_API_KEY = os.getenv("MAILGUN_API_KEY", "")
+MAILGUN_DOMAIN = os.getenv("MAILGUN_DOMAIN", "")
+MAILGUN_FROM_EMAIL = os.getenv("MAILGUN_FROM_EMAIL", "")
+
+# Brevo (formerly Sendinblue) SMTP
+BREVO_SMTP_KEY = os.getenv("BREVO_SMTP_KEY", "")
+BREVO_SMTP_SERVER = os.getenv("BREVO_SMTP_SERVER", "smtp-relay.brevo.com")
+BREVO_SMTP_PORT = int(os.getenv("BREVO_SMTP_PORT", "587"))
 
 
 
@@ -91,7 +102,7 @@ def generate_otp() -> str:
 
 
 async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool, str]:
-    """Send OTP via email. Supports Resend API (HTTP) and standard SMTP."""
+    """Send OTP via email. Supports Brevo SMTP (primary), Resend API, and Gmail SMTP (fallback)."""
     import asyncio
     
     # Always print OTP to console as backup
@@ -129,7 +140,59 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
 """
 
     try:
-        # 1. Try sending via Resend API if configured
+        # 1. Try Mailgun API first (100 emails/day FREE forever!)
+        if MAILGUN_API_KEY and MAILGUN_DOMAIN:
+            try:
+                import httpx
+                print(f"[OTP] [STATUS] Sending via Mailgun API to {email}...")
+                
+                async with httpx.AsyncClient() as client:
+                    res = await client.post(
+                        f"https://api.mailgun.net/v3/{MAILGUN_DOMAIN}/messages",
+                        auth=("api", MAILGUN_API_KEY),
+                        data={
+                            "from": MAILGUN_FROM_EMAIL or f"AI FAB <mailgun@{MAILGUN_DOMAIN}>",
+                            "to": email,
+                            "subject": "AI FAB – Email Verification Code",
+                            "html": body,
+                        },
+                        timeout=15.0
+                    )
+                    if res.status_code == 200:
+                        print(f"[OTP] [SUCCESS] Email sent successfully via Mailgun to {email}")
+                        return True, "Email sent successfully via Mailgun API"
+                    else:
+                        err_msg = f"Mailgun API Error ({res.status_code}): {res.text}"
+                        print(f"[OTP] [ERROR] {err_msg}, trying next method...")
+            except Exception as e:
+                err_msg = f"Mailgun failed: {str(e)}"
+                print(f"[OTP] [ERROR] {err_msg}, trying next method...")
+        
+        # 2. Try Brevo SMTP (works for ALL emails without domain verification!)
+        if BREVO_SMTP_KEY and SMTP_EMAIL:
+            try:
+                msg = MIMEMultipart()
+                msg['From'] = SMTP_EMAIL
+                msg['To'] = email
+                msg['Subject'] = "AI FAB – Email Verification Code"
+                msg.attach(MIMEText(body, 'html'))
+                
+                print(f"[OTP] [STATUS] Sending via Brevo SMTP to {email}...")
+                loop = asyncio.get_event_loop()
+                await asyncio.wait_for(
+                    loop.run_in_executor(
+                        None,
+                        lambda: _send_brevo_smtp(msg, email)
+                    ),
+                    timeout=15.0
+                )
+                print(f"[OTP] [SUCCESS] Email sent successfully via Brevo to {email}")
+                return True, "Email sent successfully via Brevo SMTP"
+            except Exception as e:
+                err_msg = f"Brevo SMTP failed: {str(e)}"
+                print(f"[OTP] [ERROR] {err_msg}, trying next method...")
+        
+        # 3. Try sending via Resend API if configured
         resend_key = os.getenv("RESEND_API_KEY", "")
         if resend_key:
             import httpx
@@ -164,9 +227,75 @@ async def send_otp_email(email: str, otp: str, name: str = "User") -> tuple[bool
                             pass
                         err_msg = f"Resend API Error ({res.status_code}): {err_detail}"
                         print(f"[OTP] [ERROR] {err_msg}")
-                        return False, err_msg
+                        # Don't return, fall through to Gmail SMTP
             except Exception as e:
                 err_msg = f"Resend connection failed: {str(e)}"
+                print(f"[OTP] [ERROR] {err_msg}")
+                # Fall through to Gmail SMTP
+
+        # 4. Fall back to Gmail SMTP
+        if not SMTP_EMAIL or not SMTP_PASSWORD:
+            print(f"[OTP] [EMAIL] Email not configured. Using console OTP only.")
+            return True, "Email not configured, bypassed using console backup."
+
+        # Create email message for Gmail SMTP
+        msg = MIMEMultipart()
+        msg['From'] = SMTP_EMAIL
+        msg['To'] = email
+        msg['Subject'] = "AI FAB – Email Verification Code"
+        msg.attach(MIMEText(body, 'html'))
+
+        # Send email synchronously with timeout
+        loop = asyncio.get_event_loop()
+        try:
+            await asyncio.wait_for(
+                loop.run_in_executor(
+                    None,
+                    lambda: _send_smtp(msg, email, otp)
+                ),
+                timeout=15.0
+            )
+            print(f"[OTP] [SUCCESS] Email sent successfully via Gmail SMTP to {email}")
+            return True, "Email sent successfully via Gmail SMTP"
+            
+        except asyncio.TimeoutError:
+            err_msg = f"SMTP Connection Timeout: Connecting to {SMTP_SERVER}:{SMTP_PORT} timed out. Outbound SMTP ports might be blocked. Please configure MAILGUN_API_KEY."
+            print(f"[OTP] [TIMEOUT] {err_msg}")
+            return False, err_msg
+        except Exception as e:
+            err_msg = f"Gmail SMTP Failed: {str(e)}"
+            print(f"[OTP] [ERROR] {err_msg}")
+            import traceback
+            traceback.print_exc()
+            return False, err_msg
+        
+    except Exception as e:
+        err_msg = f"Unexpected email module error: {str(e)}"
+        print(f"[OTP] [ERROR] {err_msg}")
+        import traceback
+        traceback.print_exc()
+        return False, err_msg
+
+
+def _send_brevo_smtp(msg, email):
+    """Send email via Brevo SMTP"""
+    try:
+        print(f"[OTP] [STATUS] Connecting to {BREVO_SMTP_SERVER}:{BREVO_SMTP_PORT}...")
+        with smtplib.SMTP(BREVO_SMTP_SERVER, BREVO_SMTP_PORT, timeout=10) as server:
+            print(f"[OTP] [STATUS] Starting TLS...")
+            server.starttls()
+            print(f"[OTP] [STATUS] Logging in with Brevo SMTP key...")
+            server.login(SMTP_EMAIL, BREVO_SMTP_KEY)
+            print(f"[OTP] [STATUS] Sending email to {email}...")
+            server.send_message(msg)
+            print(f"[OTP] [SUCCESS] Brevo SMTP send_message completed for {email}")
+    except smtplib.SMTPAuthenticationError as e:
+        print(f"[OTP] [ERROR] Brevo SMTP Authentication Error: {e}")
+        print(f"[OTP] 💡 Check your Brevo SMTP key at https://app.brevo.com/settings/keys/smtp")
+        raise
+    except Exception as e:
+        print(f"[OTP] [ERROR] Brevo SMTP Error: {e}")
+        raise
                 print(f"[OTP] [ERROR] {err_msg}")
                 return False, err_msg
 

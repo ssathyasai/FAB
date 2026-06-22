@@ -7,7 +7,6 @@ const BUDGET_ITEMS = [
   { href: "/budget/setup",        icon: "fas fa-rocket",         label: "Setup Wizard" },
   { href: "/budget/overview",     icon: "fas fa-chart-pie",      label: "Overview" },
   { href: "/budget/plan",         icon: "fas fa-sliders-h",      label: "Budget Plan" },
-  { href: "/budget/transactions", icon: "fas fa-exchange-alt",   label: "Transactions" },
   { href: "/budget/optimizer",    icon: "fas fa-magic",          label: "Optimizer" },
   { href: "/budget/leaks",        icon: "fas fa-tint",           label: "Leak Detector" },
   { href: "/finance/whatif",      icon: "fas fa-calculator",     label: "What If" },
