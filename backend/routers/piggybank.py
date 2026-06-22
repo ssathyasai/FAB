@@ -119,6 +119,28 @@ async def add_transaction(piggy_bank_id: str, req: PiggyBankTransactionRequest, 
         upsert=True
     )
     
+    # Update primary bank account if exists
+    primary_account = await db.bank_accounts.find_one({"is_primary": True})
+    if not primary_account:
+        primary_account = await db.bank_accounts.find_one({})
+        
+    account_id = None
+    account_name = None
+    
+    if primary_account:
+        if req.amount > 0:
+            new_primary_balance = primary_account["balance"] - req.amount
+        else:
+            new_primary_balance = primary_account["balance"] + abs(req.amount)
+            
+        await db.bank_accounts.update_one(
+            {"_id": primary_account["_id"]},
+            {"$set": {"balance": new_primary_balance, "updated_at": datetime.utcnow()}}
+        )
+        
+        account_id = str(primary_account["_id"])
+        account_name = primary_account["name"]
+    
     # Create piggy bank transaction
     piggy_transaction = {
         "piggy_bank_id": piggy_bank_id,
@@ -144,6 +166,8 @@ async def add_transaction(piggy_bank_id: str, req: PiggyBankTransactionRequest, 
         "balance_after": new_bank_balance,
         "piggy_bank_id": piggy_bank_id,
         "piggy_bank_name": piggy_bank["name"],
+        "account_id": account_id,
+        "account_name": account_name,
         "created_at": datetime.utcnow(),
         "month": current_month(),
     }

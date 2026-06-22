@@ -565,8 +565,11 @@ async def get_emergency_recommendations(req: dict) -> dict:
     income = req.get('income', 0)
     details = req.get('emergency_details', {})
     
-    # Extract savings
-    savings = float(details.get('savings', 0))
+    # Extract savings and assets
+    savings = float(details.get('available_savings', details.get('savings', 0)))
+    monthly_expenses = float(details.get('monthly_expenses', 0))
+    assets = details.get('assets', [])
+    assets_str = json.dumps(assets) if assets else "None"
     
     # If no AI provider, use rule-based
     if not _has_any_provider():
@@ -576,12 +579,14 @@ async def get_emergency_recommendations(req: dict) -> dict:
     context_lines = [
         f"Emergency Type: {emergency_type}",
         f"Monthly Income: ₹{income:,.0f}",
-        f"Available Savings: ₹{savings:,.0f}"
+        f"Monthly Expenses: ₹{monthly_expenses:,.0f}",
+        f"Available Savings: ₹{savings:,.0f}",
+        f"User Assets: {assets_str}"
     ]
     
     # Add only filled details
     for key, value in details.items():
-        if value and str(value).strip() and key != 'savings':
+        if value and str(value).strip() and key not in ['savings', 'available_savings', 'monthly_income', 'monthly_expenses', 'monthly_surplus', 'total_assets_value', 'assets']:
             label = key.replace('_', ' ').title()
             context_lines.append(f"{label}: {value}")
     
@@ -596,7 +601,7 @@ Return ONLY valid JSON:
 {{
   "financial_summary": {{
     "income": {income},
-    "expenses": 0,
+    "expenses": {monthly_expenses},
     "savings": {savings},
     "gap": 0
   }},
@@ -637,38 +642,12 @@ Return ONLY valid JSON:
   ],
   "asset_liquidation": [
     {{
-      "asset_type": "Fixed Deposit (FD)",
-      "expected_value": 100000,
-      "how_to_sell": "Break FD online via net banking or visit branch. Penalty: Loss of 1% interest. Get money same day.",
+      "asset_type": "Name/Type of user's asset to sell",
+      "expected_value": 0,
+      "how_to_sell": "How to sell this specific asset",
       "where_to_sell": [
-        "Your bank's mobile app - FD section",
-        "Net banking - Fixed Deposits tab",
-        "Visit bank branch with FD receipt",
-        "Call customer care for online FD break"
-      ]
-    }},
-    {{
-      "asset_type": "Gold Jewelry",
-      "expected_value": 75000,
-      "how_to_sell": "Visit gold buyers with jewelry. Get 3 quotes. Current rate: ₹6,500/gram approx.",
-      "where_to_sell": [
-        "Tanishq Goldexchange - Buyback at stores",
-        "Muthoot Finance - Gold buying counter",
-        "Manappuram - Gold purchase service",
-        "Local jewelry shops - Get competitive quotes",
-        "PaytmMoney Gold - Online selling"
-      ]
-    }},
-    {{
-      "asset_type": "Mutual Funds",
-      "expected_value": 50000,
-      "how_to_sell": "Redeem units online. Money in 3-4 business days for equity, 1-2 days for debt funds.",
-      "where_to_sell": [
-        "Zerodha Coin - Mutual funds section",
-        "Groww App - Holdings → Redeem",
-        "PaytmMoney - Mutual funds",
-        "Fund house website (e.g., HDFC MF, ICICI Prudential)",
-        "Your bank's MF portal"
+        "Place 1 to sell",
+        "Place 2 to sell"
       ]
     }}
   ],
@@ -700,8 +679,7 @@ Return ONLY valid JSON:
 
 CRITICAL: 
 - "where_to_approach" and "where_to_sell" MUST have 4-5 SPECIFIC places
-- Include apps (MoneyTap, Groww, Rupeek), banks (HDFC, ICICI), companies (Muthoot, Tanishq)
-- Give EXACT steps: "Download X app → KYC → Apply → Get money in Y hours"
+- ONLY suggest liquidating assets that are explicitly listed in "User Assets" above. Do not invent assets they do not own. If they have no assets, return an empty array [] for asset_liquidation.
 - Be PRACTICAL for Indian context"""
     
     try:

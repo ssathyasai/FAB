@@ -214,6 +214,11 @@ async def what_if_analysis(
 
     income = income_res[0]["total"] if income_res else 0
     expenses = expense_res[0]["total"] if expense_res else 0
+    
+    settings = await db.settings.find_one({"user_id": user_id})
+    if income == 0 and settings:
+        income = settings.get("income_baseline", 0)
+        
     savings = income - expenses
 
     # Apply scenarios
@@ -221,7 +226,7 @@ async def what_if_analysis(
     new_expenses = expenses
 
     if all_expenses_change != 0:
-        new_expenses *= (1 + all_expenses_change / 100)
+        new_expenses += expenses * (all_expenses_change / 100)
 
     if rent_change != 0:
         housing_res = await db.transactions.aggregate([
@@ -229,7 +234,7 @@ async def what_if_analysis(
             {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
         ]).to_list(1)
         housing = housing_res[0]["total"] if housing_res else 0
-        new_expenses = new_expenses - housing + housing * (1 + rent_change / 100)
+        new_expenses += housing * (rent_change / 100)
 
     if discretionary_change != 0:
         disc_res = await db.transactions.aggregate([
@@ -237,7 +242,7 @@ async def what_if_analysis(
             {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
         ]).to_list(1)
         disc = disc_res[0]["total"] if disc_res else 0
-        new_expenses = new_expenses - disc + disc * (1 + discretionary_change / 100)
+        new_expenses += disc * (discretionary_change / 100)
 
     new_savings = new_income - new_expenses
     new_savings_rate = (new_savings / new_income * 100) if new_income > 0 else 0
