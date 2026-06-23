@@ -902,6 +902,7 @@ async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpe
     providers = _get_provider_config()
     
     if not providers:
+        print("[OCR] No AI providers configured")
         return ""
     
     import base64
@@ -909,8 +910,11 @@ async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpe
     
     prompt = "Extract ALL text from this bill/receipt. Return only the text, exactly as it appears."
     
+    last_error = None
     for provider in providers:
         try:
+            print(f"[OCR] Trying {provider['name']} for text extraction...")
+            
             if provider["name"] == "groq":
                 from groq import Groq
                 client = Groq(api_key=provider["key"])
@@ -933,7 +937,9 @@ async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpe
                         temperature=0.0
                     )
                 )
-                return response.choices[0].message.content
+                text = response.choices[0].message.content
+                print(f"[OCR] ✅ Groq extracted {len(text)} characters")
+                return text
                 
             elif provider["name"] == "gemini":
                 from google import genai
@@ -947,7 +953,9 @@ async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpe
                         contents=[prompt, types.Part.from_bytes(data=image_bytes, mime_type=mime_type)]
                     )
                 )
-                return response.text
+                text = response.text
+                print(f"[OCR] ✅ Gemini extracted {len(text)} characters")
+                return text
                 
             elif provider["name"] == "openai":
                 from openai import OpenAI
@@ -971,11 +979,16 @@ async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpe
                         temperature=0.0
                     )
                 )
-                return response.choices[0].message.content
+                text = response.choices[0].message.content
+                print(f"[OCR] ✅ OpenAI extracted {len(text)} characters")
+                return text
                 
         except Exception as e:
+            last_error = e
+            print(f"[OCR] ❌ {provider['name']} failed: {str(e)}")
             continue
     
+    print(f"[OCR] All providers failed. Last error: {last_error}")
     return ""
 
 
@@ -1038,19 +1051,23 @@ Rules:
 async def analyze_bill_ocr_then_ai(image_bytes: bytes, mime_type: str = "image/jpeg", total_amount: float = 0) -> dict:
     """
     Two-step approach: OCR extract text, then text AI for categorization
-    More cost-effective than direct vision AI
+    Falls back to direct vision AI if OCR fails
     """
-    # Step 1: Extract text using Vision AI
+    print(f"[Bill Analysis] Starting two-step analysis for ₹{total_amount}")
+    
+    # Step 1: Try to extract text using Vision AI
     bill_text = await extract_text_from_bill(image_bytes, mime_type)
     
-    if not bill_text:
-        return {
-            "error": "Could not extract text from bill",
-            "single_category": "Other",
-            "confidence": 0.0
-        }
-    
-    # Step 2: Analyze text using cheaper text AI
-    result = await categorize_from_text(bill_text, total_amount)
-    result["extracted_text"] = bill_text  # Include for debugging
-    return result
+    if bill_text and len(bill_text) > 10:  # At least some text extracted
+        print(f"[Bill Analysis] Text extracted, analyzing...")
+        # Step 2: Analyze text using cheaper text AI
+        result = await categorize_from_text(bill_text, total_amount)
+        result["extracted_text"] = bill_text  # Include for debugging
+        result["method"] = "ocr_then_ai"
+        return result
+    else:
+        # Fallback: Use direct vision AI approach (original method)
+        print(f"[Bill Analysis] OCR failed, falling back to direct vision AI")
+        result = await analyze_bill_for_categories(image_bytes, mime_type, total_amount)
+        result["method"] = "direct_vision"
+        return result
