@@ -160,11 +160,6 @@ class InvestmentAdvisorRequest(BaseModel):
     preferred_style: str
 
 
-class EmergencyAdvisorRequest(BaseModel):
-    emergency_type: str
-    emergency_details: dict
-
-
 # ─── Piggy Bank Models ───────────────────────────────────────────
 
 class PiggyBank(BaseModel):

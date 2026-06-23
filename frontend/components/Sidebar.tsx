@@ -18,7 +18,6 @@ const FINANCE_ITEMS = [
   { href: "/finance/debt",        icon: "fas fa-hand-holding-usd", label: "Debt Advisor" },
   { href: "/finance/savings",     icon: "fas fa-chart-line",       label: "Saving Plan" },
   { href: "/finance/investment",  icon: "fas fa-chart-area",       label: "Investment Advisor" },
-  { href: "/finance/emergency",   icon: "fas fa-first-aid",        label: "Emergency Advisor" },
 ];
 
 function NavLink({ href, icon, label }: { href: string; icon: string; label: string }) {

@@ -12,13 +12,13 @@ router = APIRouter()
 async def get_advisor_history(advisor_type: str, current_user=Depends(get_current_user)):
     """
     Get last 3 advice history for specific advisor type
-    advisor_type: asset, debt, savings, investment, emergency
+    advisor_type: asset, debt, savings, investment
     """
     db = get_db()
     user_id = current_user["id"]
     
     # Validate advisor type
-    valid_types = ["asset", "debt", "savings", "investment", "emergency"]
+    valid_types = ["asset", "debt", "savings", "investment"]
     if advisor_type not in valid_types:
         raise HTTPException(status_code=400, detail=f"Invalid advisor type. Must be one of: {', '.join(valid_types)}")
     
@@ -45,7 +45,7 @@ async def save_advisor_history(
     user_id = current_user["id"]
     
     # Validate advisor type
-    valid_types = ["asset", "debt", "savings", "investment", "emergency"]
+    valid_types = ["asset", "debt", "savings", "investment"]
     if advisor_type not in valid_types:
         raise HTTPException(status_code=400, detail=f"Invalid advisor type. Must be one of: {', '.join(valid_types)}")
     
