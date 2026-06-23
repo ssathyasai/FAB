@@ -822,7 +822,7 @@ Rules:
                 response = await loop.run_in_executor(
                     None,
                     lambda: client.chat.completions.create(
-                        model="llama-3.2-11b-vision-preview",
+                        model="llama-3.2-90b-vision-preview",  # Updated model name
                         messages=messages,
                         max_tokens=1000,
                         temperature=0.0
@@ -931,7 +931,7 @@ async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpe
                 response = await loop.run_in_executor(
                     None,
                     lambda: client.chat.completions.create(
-                        model="llama-3.2-11b-vision-preview",
+                        model="llama-3.2-90b-vision-preview",  # Updated model name
                         messages=messages,
                         max_tokens=1500,
                         temperature=0.0
