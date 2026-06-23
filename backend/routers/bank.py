@@ -2,7 +2,7 @@
 Bank Section — replaces bank.json manual editing.
 Users manage their bank accounts directly in the app.
 """
-from fastapi import APIRouter, HTTPException, Depends, File, UploadFile
+from fastapi import APIRouter, HTTPException, Depends
 from database import get_db
 from utils import serialize_doc, serialize_docs, current_month
 from datetime import datetime
@@ -438,23 +438,4 @@ async def record_transaction(txn: dict):
 
 
 
-@router.post("/analyze-bill")
-async def analyze_bill(file: UploadFile = File(...), amount: float = 0, current_user=None):
-    """
-    Analyze bill/receipt image and suggest categories for transaction categorization.
-    Uses two-step approach: OCR extract text → Text AI analysis (more cost-effective)
-    """
-    try:
-        # Read image
-        image_bytes = await file.read()
-        mime_type = file.content_type or "image/jpeg"
-        
-        # Two-step analysis: Extract text first, then categorize
-        from ai_service import analyze_bill_ocr_then_ai
-        result = await analyze_bill_ocr_then_ai(image_bytes, mime_type, amount)
-        
-        return {"success": True, "data": result}
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
+
