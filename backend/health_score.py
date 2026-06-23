@@ -61,6 +61,29 @@ def calculate_health_score(
     categories_within_budget: int,
     total_categories: int,
 ) -> dict:
+    # Check if user has any financial activity
+    has_financial_activity = income > 0 or expenses > 0
+    
+    if not has_financial_activity:
+        # Return "Insufficient Data" state when no transactions exist
+        return {
+            "score": 0,
+            "status": "Insufficient Data",
+            "color": "gray",
+            "savings_rate_pct": 0,
+            "pillars": [
+                {"name": "Savings Rate", "points": 0, "max_points": 30},
+                {"name": "Budget Adherence", "points": 0, "max_points": 25},
+                {"name": "Income Stability", "points": 0, "max_points": 20},
+                {"name": "Spending Discipline", "points": 0, "max_points": 25},
+            ],
+            "recommendations": [
+                "Start by adding your income transactions",
+                "Add your expenses to track spending patterns",
+                "Set up a budget to monitor your financial health"
+            ],
+        }
+    
     if income <= 0:
         savings_rate_pct = 0
     else:
