@@ -798,39 +798,12 @@ Rules:
     last_error = None
     
     for provider in providers:
+        # Skip Groq for vision tasks (all vision models deprecated)
+        if provider["name"] == "groq":
+            continue
+            
         try:
-            if provider["name"] == "groq":
-                from groq import Groq
-                client = Groq(api_key=provider["key"])
-                loop = asyncio.get_event_loop()
-                
-                messages = [
-                    {
-                        "role": "user",
-                        "content": [
-                            {"type": "text", "text": prompt},
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:{mime_type};base64,{base64_image}"
-                                }
-                            }
-                        ]
-                    }
-                ]
-                
-                response = await loop.run_in_executor(
-                    None,
-                    lambda: client.chat.completions.create(
-                        model="llama-3.2-90b-vision-preview",  # Updated model name
-                        messages=messages,
-                        max_tokens=1000,
-                        temperature=0.0
-                    )
-                )
-                return _parse_json(response.choices[0].message.content)
-
-            elif provider["name"] == "gemini":
+            if provider["name"] == "gemini":
                 from google import genai
                 from google.genai import types
                 client = genai.Client(api_key=provider["key"])
@@ -912,36 +885,15 @@ async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpe
     
     last_error = None
     for provider in providers:
+        # Skip Groq for vision tasks (all vision models deprecated)
+        if provider["name"] == "groq":
+            print(f"[OCR] Skipping Groq (no active vision models)")
+            continue
+            
         try:
             print(f"[OCR] Trying {provider['name']} for text extraction...")
             
-            if provider["name"] == "groq":
-                from groq import Groq
-                client = Groq(api_key=provider["key"])
-                loop = asyncio.get_event_loop()
-                
-                messages = [{
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
-                    ]
-                }]
-                
-                response = await loop.run_in_executor(
-                    None,
-                    lambda: client.chat.completions.create(
-                        model="llama-3.2-90b-vision-preview",  # Updated model name
-                        messages=messages,
-                        max_tokens=1500,
-                        temperature=0.0
-                    )
-                )
-                text = response.choices[0].message.content
-                print(f"[OCR] ✅ Groq extracted {len(text)} characters")
-                return text
-                
-            elif provider["name"] == "gemini":
+            if provider["name"] == "gemini":
                 from google import genai
                 from google.genai import types
                 client = genai.Client(api_key=provider["key"])
