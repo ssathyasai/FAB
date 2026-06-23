@@ -892,3 +892,165 @@ Rules:
         "confidence": 0.0,
         "items": []
     }
+
+
+
+# ─── OCR + Text Analysis Approach ───────────────────────────────
+
+async def extract_text_from_bill(image_bytes: bytes, mime_type: str = "image/jpeg") -> str:
+    """Extract text from bill using Vision AI OCR"""
+    providers = _get_provider_config()
+    
+    if not providers:
+        return ""
+    
+    import base64
+    base64_image = base64.b64encode(image_bytes).decode('utf-8')
+    
+    prompt = "Extract ALL text from this bill/receipt. Return only the text, exactly as it appears."
+    
+    for provider in providers:
+        try:
+            if provider["name"] == "groq":
+                from groq import Groq
+                client = Groq(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                
+                messages = [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
+                    ]
+                }]
+                
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.chat.completions.create(
+                        model="llama-3.2-11b-vision-preview",
+                        messages=messages,
+                        max_tokens=1500,
+                        temperature=0.0
+                    )
+                )
+                return response.choices[0].message.content
+                
+            elif provider["name"] == "gemini":
+                from google import genai
+                from google.genai import types
+                client = genai.Client(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.models.generate_content(
+                        model="gemini-2.0-flash-lite",
+                        contents=[prompt, types.Part.from_bytes(data=image_bytes, mime_type=mime_type)]
+                    )
+                )
+                return response.text
+                
+            elif provider["name"] == "openai":
+                from openai import OpenAI
+                client = OpenAI(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                
+                messages = [{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": prompt},
+                        {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{base64_image}"}}
+                    ]
+                }]
+                
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages,
+                        max_tokens=1500,
+                        temperature=0.0
+                    )
+                )
+                return response.choices[0].message.content
+                
+        except Exception as e:
+            continue
+    
+    return ""
+
+
+async def categorize_from_text(bill_text: str, total_amount: float = 0) -> dict:
+    """Analyze extracted bill text and suggest categories (cheaper than vision)"""
+    if not bill_text:
+        return {
+            "error": "No text extracted from bill",
+            "single_category": "Other",
+            "confidence": 0.0
+        }
+    
+    prompt = f"""Analyze this bill text and suggest categories.
+
+Bill Text:
+{bill_text}
+
+Total Amount from System: ₹{total_amount}
+
+Available Categories:
+- Food & Dining
+- Transport
+- Shopping
+- Healthcare
+- Entertainment
+- Utilities
+- Groceries
+- Education
+- Other
+
+Return JSON:
+{{
+  "merchant": "Store name",
+  "bill_amount": 0,
+  "is_itemized": true/false,
+  "single_category": "Category",
+  "confidence": 0.95,
+  "items": [
+    {{"name": "Item", "amount": 0, "suggested_category": "Category"}}
+  ]
+}}
+
+Rules:
+- If items are listed, set is_itemized=true
+- For single total only, set is_itemized=false
+- Only use categories from the list
+- Ensure item amounts sum to bill_amount"""
+
+    try:
+        text_response = await call_ai(prompt, max_tokens=1000)
+        return _parse_json(text_response)
+    except Exception as e:
+        return {
+            "error": str(e),
+            "single_category": "Other",
+            "confidence": 0.0
+        }
+
+
+async def analyze_bill_ocr_then_ai(image_bytes: bytes, mime_type: str = "image/jpeg", total_amount: float = 0) -> dict:
+    """
+    Two-step approach: OCR extract text, then text AI for categorization
+    More cost-effective than direct vision AI
+    """
+    # Step 1: Extract text using Vision AI
+    bill_text = await extract_text_from_bill(image_bytes, mime_type)
+    
+    if not bill_text:
+        return {
+            "error": "Could not extract text from bill",
+            "single_category": "Other",
+            "confidence": 0.0
+        }
+    
+    # Step 2: Analyze text using cheaper text AI
+    result = await categorize_from_text(bill_text, total_amount)
+    result["extracted_text"] = bill_text  # Include for debugging
+    return result

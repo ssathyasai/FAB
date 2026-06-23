@@ -442,16 +442,16 @@ async def record_transaction(txn: dict):
 async def analyze_bill(file: UploadFile = File(...), amount: float = 0, current_user=None):
     """
     Analyze bill/receipt image and suggest categories for transaction categorization.
-    Used when categorizing existing transactions.
+    Uses two-step approach: OCR extract text → Text AI analysis (more cost-effective)
     """
     try:
         # Read image
         image_bytes = await file.read()
         mime_type = file.content_type or "image/jpeg"
         
-        # Analyze with Vision AI
-        from ai_service import analyze_bill_for_categories
-        result = await analyze_bill_for_categories(image_bytes, mime_type, amount)
+        # Two-step analysis: Extract text first, then categorize
+        from ai_service import analyze_bill_ocr_then_ai
+        result = await analyze_bill_ocr_then_ai(image_bytes, mime_type, amount)
         
         return {"success": True, "data": result}
     except Exception as e:
