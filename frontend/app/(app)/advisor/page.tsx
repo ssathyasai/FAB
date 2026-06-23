@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import AIInsights from "@/components/advisor/AIInsights";
 import AssetAdvisor from "@/components/advisor/AssetAdvisor";
 import SavingsAdvisor from "@/components/advisor/SavingsAdvisor";
@@ -19,7 +19,24 @@ const TABS = [
 ];
 
 export default function Advisor() {
-  const [tab, setTab] = useState("insights");
+  const [tab, setTab] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam && TABS.some(t => t.id === tabParam)) {
+        setTab(tabParam);
+      } else {
+        setTab("insights");
+      }
+    }
+  }, []);
+
+  if (!tab) {
+    return <div style={{ display: "flex", justifyContent: "center", padding: "3rem" }}><div className="spinner" /></div>;
+  }
+
   const active = TABS.find(t => t.id === tab);
 
   return (

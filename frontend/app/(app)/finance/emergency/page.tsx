@@ -14,7 +14,7 @@ export default function FinanceEmergencyRedirect() {
   
   useEffect(() => {
     // Redirect to the new advisor page
-    router.push("/advisor");
+    router.push("/advisor?tab=emergency");
   }, [router]);
   
   return (
