@@ -25,7 +25,6 @@ yarn-error.log*
 *.tsbuildinfo
 
 # ── Environment files (NEVER commit secrets) ─────────────────────
-.env
 .env.local
 .env.*.local
 
