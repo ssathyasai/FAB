@@ -33,9 +33,9 @@ export default function AIInsights() {
           <i className="fas fa-chart-bar" style={{ color: "var(--accent)", marginRight: 6 }} />Key Insights
         </div>
         {(data?.top_3_insights || []).map((i: string, idx: number) => (
-          <div key={idx} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-            <span style={{ color: "var(--accent)", fontWeight: 700 }}>{idx + 1}.</span>
-            <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9rem" }}>{i}</span>
+          <div key={idx} style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+            <span style={{ color: "var(--accent)", fontWeight: 700, flexShrink: 0, minWidth: "16px" }}>{idx + 1}.</span>
+            <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9rem", flex: 1 }}>{i}</span>
           </div>
         ))}
       </div>
@@ -52,9 +52,9 @@ export default function AIInsights() {
           <i className="fas fa-lightbulb" style={{ color: "var(--accent)", marginRight: 6 }} />Personalized Advice
         </div>
         {(data?.personalized_advice || []).map((a: string, idx: number) => (
-          <div key={idx} style={{ display: "flex", gap: 10, marginBottom: 8 }}>
-            <span style={{ color: "var(--accent)" }}>💡</span>
-            <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9rem" }}>{a}</span>
+          <div key={idx} style={{ display: "flex", flexDirection: "row", alignItems: "flex-start", gap: 10, marginBottom: 8 }}>
+            <span style={{ color: "var(--accent)", flexShrink: 0 }}>💡</span>
+            <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.9rem", flex: 1 }}>{a}</span>
           </div>
         ))}
       </div>

@@ -213,42 +213,7 @@ export default function EmergencyAdvisor() {
         <div className="card" style={{ padding: "1.5rem", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <h3 style={{ fontWeight: 700, marginBottom: "1rem", fontSize: "1.1rem" }}>🆘 Emergency Advisor</h3>
           
-          {/* User Financial Summary */}
-          {!userData.loading && (
-            <div style={{ 
-              padding: "0.8rem", 
-              background: "rgba(99,102,241,0.1)", 
-              borderRadius: "0.5rem",
-              border: "1px solid rgba(99,102,241,0.3)",
-              marginBottom: "1rem"
-            }}>
-              <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: "0.5rem" }}>
-                YOUR FINANCIAL DATA
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "0.75rem" }}>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Income:</span>{" "}
-                  <span style={{ color: "#34d399", fontWeight: 600 }}>₹{userData.income.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Expenses:</span>{" "}
-                  <span style={{ color: "#f59e0b", fontWeight: 600 }}>₹{userData.expenses.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Savings:</span>{" "}
-                  <span style={{ color: "#3b82f6", fontWeight: 600 }}>₹{userData.savings.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Assets:</span>{" "}
-                  <span style={{ color: "#a78bfa", fontWeight: 600 }}>{userData.assets.length} items</span>
-                </div>
-              </div>
-              <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem" }}>
-                ✓ Auto-loaded from your profile
-              </div>
-            </div>
-          )}
-          
+
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
             {/* Emergency Type Selection */}
             <div>
@@ -332,43 +297,7 @@ export default function EmergencyAdvisor() {
             </div>
           ) : (
             <>
-              {/* Financial Summary */}
-              {result.financial_summary && (
-                <div className="card" style={{ padding: "1.2rem", borderLeft: "3px solid #3b82f6" }}>
-                  <h4 style={{ fontWeight: 700, color: "#3b82f6", marginBottom: "0.8rem", fontSize: "0.95rem" }}>
-                    📊 Your Financial Situation
-                  </h4>
-                  <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1rem" }}>
-                    <div>
-                      <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>Monthly Income</div>
-                      <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#34d399" }}>
-                        ₹{result.financial_summary.income?.toLocaleString() || 0}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>Monthly Expenses</div>
-                      <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#f59e0b" }}>
-                        ₹{result.financial_summary.expenses?.toLocaleString() || 0}
-                      </div>
-                    </div>
-                    <div>
-                      <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)" }}>Available Savings</div>
-                      <div style={{ fontSize: "1.2rem", fontWeight: 700, color: "#3b82f6" }}>
-                        ₹{result.financial_summary.savings?.toLocaleString() || 0}
-                      </div>
-                    </div>
-                  </div>
-                  {result.financial_summary.gap && (
-                    <div style={{ marginTop: "0.8rem", padding: "0.6rem", background: "rgba(255,107,107,0.1)", borderRadius: "0.4rem", borderLeft: "3px solid #ff6b6b" }}>
-                      <div style={{ fontSize: "0.75rem", color: "#ff6b6b", fontWeight: 600 }}>
-                        💰 Financial Gap: ₹{result.financial_summary.gap.toLocaleString()}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Situation Assessment */}
+{/* Situation Assessment */}
               {result.situation_assessment && (
                 <div className="card" style={{ padding: "1.2rem", borderLeft: "3px solid #ff6b6b" }}>
                   <h4 style={{ fontWeight: 700, color: "#ff6b6b", marginBottom: "0.5rem", fontSize: "0.95rem", textTransform: "uppercase" }}>
