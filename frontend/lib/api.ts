@@ -27,6 +27,14 @@ export const updateBankAccount = (id: string, d: object) => api.put(`/api/bank/a
 export const deleteBankAccount = (id: string)  => api.delete(`/api/bank/accounts/${id}`);
 export const updateBalance     = (id: string, d: object) => api.post(`/api/bank/accounts/${id}/update-balance`, d);
 export const bankTransfer      = (d: object)   => api.post("/api/bank/transfer", d);
+export const analyzeBill       = (file: File, amount: number) => {
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("amount", String(amount));
+  return api.post("/api/bank/analyze-bill", formData, {
+    headers: { "Content-Type": "multipart/form-data" }
+  });
+};
 export const getDashboardSummary = () => api.get("/api/dashboard/summary");
 export const getLeakDetector = () => api.get("/api/dashboard/leak-detector");
 

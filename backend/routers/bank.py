@@ -435,3 +435,26 @@ async def record_transaction(txn: dict):
         "new_balance": new_balance,
         "leak_detected": leak_detected,
     }
+
+
+
+@router.post("/analyze-bill")
+async def analyze_bill(file: UploadFile = File(...), amount: float = 0, current_user=None):
+    """
+    Analyze bill/receipt image and suggest categories for transaction categorization.
+    Used when categorizing existing transactions.
+    """
+    try:
+        # Read image
+        image_bytes = await file.read()
+        mime_type = file.content_type or "image/jpeg"
+        
+        # Analyze with Vision AI
+        from ai_service import analyze_bill_for_categories
+        result = await analyze_bill_for_categories(image_bytes, mime_type, amount)
+        
+        return {"success": True, "data": result}
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

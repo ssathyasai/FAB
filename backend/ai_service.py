@@ -738,3 +738,157 @@ def _rule_based_emergency_plan(req: dict) -> dict:
         ],
         "_note": "Rule-based recommendations. For AI-powered advice, configure GROQ_API_KEY or GEMINI_API_KEY."
     }
+
+
+# ─── Bill Scanner for Categorization ───────────────────────────────
+
+async def analyze_bill_for_categories(image_bytes: bytes, mime_type: str = "image/jpeg", total_amount: float = 0) -> dict:
+    """Analyze bill/receipt and suggest categories for transaction categorization"""
+    providers = _get_provider_config()
+    
+    if not providers:
+        return {
+            "error": "No AI provider configured. Add GROQ_API_KEY, GEMINI_API_KEY, or OPENAI_API_KEY to .env file.",
+            "single_category": "Food & Dining",
+            "confidence": 0.0
+        }
+    
+    import base64
+    base64_image = base64.b64encode(image_bytes).decode('utf-8')
+    
+    prompt = f"""Analyze this bill/receipt and extract categorization information.
+
+Total Amount from System: ₹{total_amount}
+
+Available Categories:
+- Food & Dining
+- Transport
+- Shopping
+- Healthcare
+- Entertainment
+- Utilities
+- Groceries
+- Education
+- Other
+
+Return JSON in this exact format:
+{{
+  "merchant": "Store/Restaurant name",
+  "bill_amount": 0,
+  "is_itemized": true/false,
+  "single_category": "Best matching category from list above",
+  "confidence": 0.95,
+  "items": [
+    {{
+      "name": "Item name",
+      "amount": 0,
+      "suggested_category": "Category from list above"
+    }}
+  ]
+}}
+
+Rules:
+- If bill shows individual items, set is_itemized=true and fill items array
+- If bill only shows total, set is_itemized=false and suggest single_category
+- For groceries with mixed items, suggest splitting into Groceries/Food & Dining/Household
+- confidence should be 0.0-1.0 based on bill clarity
+- Ensure item amounts sum to bill_amount
+- Only use categories from the list above"""
+
+    last_error = None
+    
+    for provider in providers:
+        try:
+            if provider["name"] == "groq":
+                from groq import Groq
+                client = Groq(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+                
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.chat.completions.create(
+                        model="llama-3.2-11b-vision-preview",
+                        messages=messages,
+                        max_tokens=1000,
+                        temperature=0.0
+                    )
+                )
+                return _parse_json(response.choices[0].message.content)
+
+            elif provider["name"] == "gemini":
+                from google import genai
+                from google.genai import types
+                client = genai.Client(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.models.generate_content(
+                        model="gemini-2.0-flash-lite",
+                        contents=[
+                            prompt,
+                            types.Part.from_bytes(data=image_bytes, mime_type=mime_type)
+                        ]
+                    )
+                )
+                return _parse_json(response.text)
+                
+            elif provider["name"] == "openai":
+                from openai import OpenAI
+                client = OpenAI(api_key=provider["key"])
+                loop = asyncio.get_event_loop()
+                
+                messages = [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "text", "text": prompt},
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:{mime_type};base64,{base64_image}"
+                                }
+                            }
+                        ]
+                    }
+                ]
+                
+                response = await loop.run_in_executor(
+                    None,
+                    lambda: client.chat.completions.create(
+                        model="gpt-4o-mini",
+                        messages=messages,
+                        max_tokens=1000,
+                        temperature=0.0
+                    )
+                )
+                return _parse_json(response.choices[0].message.content)
+                
+        except Exception as e:
+            last_error = e
+            continue
+    
+    # Fallback response if all providers fail
+    return {
+        "error": f"Bill analysis failed: {str(last_error)}",
+        "merchant": "Unknown",
+        "bill_amount": total_amount,
+        "is_itemized": False,
+        "single_category": "Other",
+        "confidence": 0.0,
+        "items": []
+    }

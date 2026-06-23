@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { api, getTransactions, categorizeTransaction, splitCategorizeTransaction } from "@/lib/api";
+import { api, getTransactions, categorizeTransaction, splitCategorizeTransaction, analyzeBill } from "@/lib/api";
 import { formatINR, formatDate, formatTime, EXPENSE_CATEGORIES, CATEGORY_ICONS } from "@/lib/utils";
 import { PageHeader, Loading, Empty } from "@/components/ui";
 import toast from "react-hot-toast";
@@ -40,6 +40,9 @@ export default function BankAccounts() {
     { expense_category: "", amount: "", note: "" },
     { expense_category: "", amount: "", note: "" },
   ]);
+
+  // Bill Scanner State
+  const [scanning, setScanning] = useState(false);
 
   const loadBalance = async () => {
     try {
@@ -103,6 +106,7 @@ export default function BankAccounts() {
   const openModal = (tx: any) => {
     setModal(tx);
     setIsSplitting(false);
+    setScanning(false);
     setSplits([
       { expense_category: "", amount: "", note: "" },
       { expense_category: "", amount: "", note: "" },
@@ -113,6 +117,52 @@ export default function BankAccounts() {
       income_type: tx.income_type || "",
       note: tx.note || "",
     });
+  };
+
+  const handleBillScan = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    setScanning(true);
+    const toastId = toast.loading("📸 Scanning bill with AI...");
+    
+    try {
+      const response = await analyzeBill(file, modal.amount);
+      const data = response.data.data;
+      
+      if (data.error) {
+        toast.error(data.error, { id: toastId });
+        return;
+      }
+      
+      // Check if itemized
+      if (data.is_itemized && data.items && data.items.length > 1) {
+        // Switch to split mode and pre-fill
+        setIsSplitting(true);
+        const newSplits = data.items.map((item: any) => ({
+          expense_category: item.suggested_category || "",
+          amount: String(item.amount || ""),
+          note: item.name || ""
+        }));
+        setSplits(newSplits);
+        toast.success(`✅ Found ${data.items.length} items! Review and confirm split.`, { id: toastId });
+      } else {
+        // Single category
+        setIsSplitting(false);
+        setForm(f => ({
+          ...f,
+          expense_category: data.single_category || "",
+          note: data.merchant || f.note
+        }));
+        toast.success(`✅ Suggested: ${data.single_category}`, { id: toastId });
+      }
+    } catch (error: any) {
+      console.error("Bill scan error:", error);
+      toast.error(error?.response?.data?.detail || "Failed to scan bill", { id: toastId });
+    } finally {
+      setScanning(false);
+      if (e.target) e.target.value = "";
+    }
   };
 
   const save = async () => {
@@ -769,40 +819,89 @@ export default function BankAccounts() {
 
             {/* Mode Selector Tabs (only for debit) */}
             {modal.transaction_type === "debit" && (
-              <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.5rem", background: "rgba(255,255,255,0.03)", padding: 4, borderRadius: 8 }}>
-                <button
-                  onClick={() => setIsSplitting(false)}
-                  style={{
-                    flex: 1,
-                    padding: "0.5rem",
-                    borderRadius: 6,
-                    border: "none",
-                    background: !isSplitting ? "rgba(59,130,246,0.15)" : "transparent",
-                    color: !isSplitting ? "#3b82f6" : "var(--text3)",
-                    fontWeight: 600,
-                    fontSize: "0.8rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  Single Category
-                </button>
-                <button
-                  onClick={() => setIsSplitting(true)}
-                  style={{
-                    flex: 1,
-                    padding: "0.5rem",
-                    borderRadius: 6,
-                    border: "none",
-                    background: isSplitting ? "rgba(59,130,246,0.15)" : "transparent",
-                    color: isSplitting ? "#3b82f6" : "var(--text3)",
-                    fontWeight: 600,
-                    fontSize: "0.8rem",
-                    cursor: "pointer",
-                  }}
-                >
-                  Split Categories
-                </button>
-              </div>
+              <>
+                <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem", background: "rgba(255,255,255,0.03)", padding: 4, borderRadius: 8 }}>
+                  <button
+                    onClick={() => setIsSplitting(false)}
+                    style={{
+                      flex: 1,
+                      padding: "0.5rem",
+                      borderRadius: 6,
+                      border: "none",
+                      background: !isSplitting ? "rgba(59,130,246,0.15)" : "transparent",
+                      color: !isSplitting ? "#3b82f6" : "var(--text3)",
+                      fontWeight: 600,
+                      fontSize: "0.8rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Single Category
+                  </button>
+                  <button
+                    onClick={() => setIsSplitting(true)}
+                    style={{
+                      flex: 1,
+                      padding: "0.5rem",
+                      borderRadius: 6,
+                      border: "none",
+                      background: isSplitting ? "rgba(59,130,246,0.15)" : "transparent",
+                      color: isSplitting ? "#3b82f6" : "var(--text3)",
+                      fontWeight: 600,
+                      fontSize: "0.8rem",
+                      cursor: "pointer",
+                    }}
+                  >
+                    Split Categories
+                  </button>
+                </div>
+                
+                {/* Bill Scanner Button */}
+                <div style={{ marginBottom: "1.5rem" }}>
+                  <input 
+                    id="bill-scanner"
+                    type="file" 
+                    accept="image/*" 
+                    style={{ display: "none" }} 
+                    onChange={handleBillScan}
+                    disabled={scanning}
+                  />
+                  <button
+                    onClick={() => document.getElementById("bill-scanner")?.click()}
+                    disabled={scanning}
+                    style={{
+                      width: "100%",
+                      padding: "0.8rem",
+                      borderRadius: 8,
+                      border: "2px dashed rgba(139, 92, 246, 0.3)",
+                      background: "rgba(139, 92, 246, 0.05)",
+                      color: "#8b5cf6",
+                      cursor: scanning ? "not-allowed" : "pointer",
+                      fontSize: "0.85rem",
+                      fontWeight: 600,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "0.5rem",
+                      opacity: scanning ? 0.6 : 1
+                    }}
+                  >
+                    {scanning ? (
+                      <>
+                        <i className="fas fa-spinner fa-spin" />
+                        Scanning Bill...
+                      </>
+                    ) : (
+                      <>
+                        <i className="fas fa-camera" />
+                        📸 Scan Bill to Auto-Categorize
+                      </>
+                    )}
+                  </button>
+                  <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem", textAlign: "center" }}>
+                    AI will detect items and suggest categories
+                  </div>
+                </div>
+              </>
             )}
 
             {!isSplitting ? (
