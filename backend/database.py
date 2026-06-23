@@ -87,6 +87,10 @@ async def connect_db():
         await db.users.create_index("email", unique=True)
         print("[DB] ✅ Unique index on users(email)")
         
+        # Advisor History indexes
+        await db.advisor_history.create_index([("user_id", 1), ("advisor_type", 1), ("created_at", -1)])
+        print("[DB] ✅ Index on advisor_history(user_id, advisor_type, created_at)")
+        
         print("[DB] 🎉 All database indexes created successfully!")
         
     except Exception as e:

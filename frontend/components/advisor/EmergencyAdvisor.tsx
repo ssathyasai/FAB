@@ -24,7 +24,15 @@ export default function EmergencyAdvisor() {
   const [loading, setLoading] = useState(false);
   
   // Auto-fetch user's financial data
-  const [userData, setUserData] = useState<any>({
+  interface UserData {
+    assets: any[];
+    income: number;
+    expenses: number;
+    savings: number;
+    loading: boolean;
+  }
+
+  const [userData, setUserData] = useState<UserData>({
     assets: [],
     income: 0,
     expenses: 0,
@@ -38,7 +46,7 @@ export default function EmergencyAdvisor() {
 
   const fetchUserFinancialData = async () => {
     try {
-      setUserData(prev => ({ ...prev, loading: true }));
+      setUserData((prev: UserData) => ({ ...prev, loading: true }));
       
       // Fetch assets
       const assetsRes = await api.get("/api/assets");

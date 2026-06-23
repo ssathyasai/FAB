@@ -12,7 +12,7 @@ from datetime import datetime
 from database import connect_db, close_db, get_db
 from bank_watcher import watch_bank
 from asset_value_tracker import background_asset_updater
-from routers import transactions, budget, dashboard, alerts, advisor, settings as settings_router, auth as auth_router, bank as bank_router, coach as coach_router, assets as assets_router, piggybank as piggybank_router
+from routers import transactions, budget, dashboard, alerts, advisor, settings as settings_router, auth as auth_router, bank as bank_router, coach as coach_router, assets as assets_router, piggybank as piggybank_router, advisor_history
 from routers.auth import get_current_user
 import os
 from dotenv import load_dotenv
@@ -63,6 +63,7 @@ app.include_router(budget.router, prefix="/api/budget", tags=["Budget"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(alerts.router, prefix="/api/alerts", tags=["Alerts"])
 app.include_router(advisor.router, prefix="/api/advisor", tags=["Advisor"])
+app.include_router(advisor_history.router, prefix="/api/advisor", tags=["Advisor History"])
 app.include_router(settings_router.router, prefix="/api/settings", tags=["Settings"])
 app.include_router(auth_router.router, prefix="/api/auth", tags=["Auth"])
 app.include_router(bank_router.router, prefix="/api/bank", tags=["Bank"])
