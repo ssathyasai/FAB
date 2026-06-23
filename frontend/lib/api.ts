@@ -64,6 +64,7 @@ export const postAssetAdvisor = (data: object) => api.post("/api/advisor/asset",
 export const postSavingsAdvisor = (data: object) => api.post("/api/advisor/savings", data);
 export const postDebtAdvisor = (data: object) => api.post("/api/advisor/debt", data);
 export const postInvestmentAdvisor = (data: object) => api.post("/api/advisor/investment", data);
+export const postEmergencyAdvisor = (data: object) => api.post("/api/advisor/emergency", data);
 
 // ─── Settings ────────────────────────────────────────────────────
 export const getSettings = () => api.get("/api/settings/");

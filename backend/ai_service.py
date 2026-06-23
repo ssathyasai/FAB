@@ -558,3 +558,183 @@ def _rule_based_investment(req: dict) -> dict:
         "_note": "AI API limit reached. Using rule-based recommendations. Add GROQ_API_KEY for personalized AI advice."
     }
 
+
+
+# ─── Emergency Advisor ──────────────────────────────────────────
+
+async def get_emergency_recovery_plan(req: dict) -> dict:
+    """Get emergency recovery plan with specific actions"""
+    emergency_type = req.get('emergency_type', 'Unknown')
+    details = req.get('emergency_details', {})
+    financial_data = req.get('user_financial_data', {})
+    
+    # Extract financial context
+    income = financial_data.get('monthly_income', 0)
+    expenses = financial_data.get('monthly_expenses', 0)
+    savings = financial_data.get('current_savings', 0)
+    assets = financial_data.get('assets', [])
+    
+    # If no AI provider, use rule-based
+    if not _has_any_provider():
+        return _rule_based_emergency_plan(req)
+    
+    # Build context for AI
+    context_lines = [
+        f"Emergency Type: {emergency_type}",
+        f"Monthly Income: ₹{income:,.0f}",
+        f"Monthly Expenses: ₹{expenses:,.0f}",
+        f"Current Savings: ₹{savings:,.0f}",
+        f"Number of Assets: {len(assets)}"
+    ]
+    
+    # Add emergency-specific details
+    for key, value in details.items():
+        if value and str(value).strip():
+            label = key.replace('_', ' ').title()
+            context_lines.append(f"{label}: {value}")
+    
+    context = "\n".join(context_lines)
+    
+    prompt = f"""You are an Emergency Financial Recovery Advisor for India. Provide ACTIONABLE recovery steps.
+
+USER SITUATION:
+{context}
+
+Provide a JSON response with:
+{{
+  "severity": "Critical/High/Moderate",
+  "immediate_actions": [
+    "Action 1 - Specific step to take now",
+    "Action 2 - Another immediate action",
+    "Action 3 - Third immediate action"
+  ],
+  "funding_options": [
+    {{
+      "option": "Option name",
+      "description": "How this helps",
+      "steps": ["Step 1", "Step 2", "Step 3"],
+      "timeline": "How long it takes"
+    }}
+  ],
+  "recovery_timeline": {{
+    "week_1": ["Action for week 1"],
+    "month_1": ["Action for month 1"],
+    "month_3": ["Action for month 3"]
+  }},
+  "key_recommendations": [
+    "Recommendation 1",
+    "Recommendation 2",
+    "Recommendation 3"
+  ]
+}}
+
+Rules:
+- Focus on ACTIONS user can take immediately
+- Be specific with Indian context (banks, apps, schemes)
+- Provide 3-5 immediate actions
+- Suggest 3-4 funding options
+- Keep recommendations practical and achievable"""
+    
+    try:
+        text = await call_ai(prompt, max_tokens=2000)
+        return _parse_json(text)
+    except Exception as e:
+        return _rule_based_emergency_plan(req)
+
+
+def _rule_based_emergency_plan(req: dict) -> dict:
+    """Rule-based emergency recovery plan"""
+    emergency_type = req.get('emergency_type', 'Unknown')
+    financial_data = req.get('user_financial_data', {})
+    savings = financial_data.get('current_savings', 0)
+    income = financial_data.get('monthly_income', 0)
+    
+    # Determine severity
+    if emergency_type in ['Medical Emergency', 'Job Loss']:
+        severity = "Critical"
+    elif emergency_type in ['Salary Delay', 'Vehicle Breakdown']:
+        severity = "Moderate"
+    else:
+        severity = "High"
+    
+    return {
+        "severity": severity,
+        "immediate_actions": [
+            "Review your current savings and available cash",
+            "Contact your bank for emergency loan options",
+            "Cut all non-essential expenses immediately",
+            "Inform family/friends who can provide support",
+            "Check if you have insurance coverage for this emergency"
+        ],
+        "funding_options": [
+            {
+                "option": "Personal Loan",
+                "description": "Quick unsecured loan from banks/NBFCs",
+                "steps": [
+                    "Apply via HDFC/ICICI mobile app",
+                    "Or use MoneyTap/Bajaj Finserv app",
+                    "Approval in 2-4 days",
+                    "Interest: 10-15% p.a."
+                ],
+                "timeline": "2-4 days"
+            },
+            {
+                "option": "Credit Card",
+                "description": "Use existing card or get instant approval",
+                "steps": [
+                    "Check your current credit limit",
+                    "Apply for instant card via HDFC/ICICI app",
+                    "OneCard app for new card",
+                    "Use only for emergency, pay back quickly"
+                ],
+                "timeline": "Instant to 5 days"
+            },
+            {
+                "option": "Salary Advance",
+                "description": "Request advance from employer",
+                "steps": [
+                    "Contact HR department immediately",
+                    "Submit written emergency request",
+                    "Usually repaid from next 2-3 salaries",
+                    "Often interest-free"
+                ],
+                "timeline": "1-5 days"
+            },
+            {
+                "option": "Family/Friends Loan",
+                "description": "Temporary help from trusted circle",
+                "steps": [
+                    "Reach out to close family members",
+                    "Be honest about repayment timeline",
+                    "Document the loan amount and terms",
+                    "Prioritize repayment to maintain trust"
+                ],
+                "timeline": "Immediate"
+            }
+        ],
+        "recovery_timeline": {
+            "week_1": [
+                "Arrange immediate funds from savings or quick loan",
+                "Address the emergency situation",
+                "Stop all non-essential spending"
+            ],
+            "month_1": [
+                "Complete emergency expenses",
+                "Start loan repayment if taken",
+                "Create survival budget"
+            ],
+            "month_3": [
+                "Rebuild emergency fund",
+                "Return to normal budget",
+                "Review financial protection (insurance)"
+            ]
+        },
+        "key_recommendations": [
+            f"You have ₹{savings:,.0f} in savings - use this first before taking loans",
+            "Priority: Savings → Salary Advance → Personal Loan → Credit Card (last resort)",
+            "Create a strict budget to handle this emergency and prevent future ones",
+            "Build 3-6 months expense emergency fund after recovery",
+            "Consider getting appropriate insurance for future protection"
+        ],
+        "_note": "Rule-based recommendations. For AI-powered advice, configure GROQ_API_KEY or GEMINI_API_KEY."
+    }

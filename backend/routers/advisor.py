@@ -1,12 +1,12 @@
 from fastapi import APIRouter, HTTPException, Query, Depends
 from models import (
     AssetAdvisorRequest, SavingAdvisorRequest, DebtAdvisorRequest,
-    InvestmentAdvisorRequest
+    InvestmentAdvisorRequest, EmergencyAdvisorRequest
 )
 from ai_service import (
     get_budget_insights, get_asset_recommendations,
     get_saving_recommendations, get_debt_recommendations,
-    get_investment_recommendations
+    get_investment_recommendations, get_emergency_recovery_plan
 )
 from database import get_db
 from utils import current_month, serialize_doc, serialize_docs
@@ -132,6 +132,47 @@ async def investment_advisor(req: InvestmentAdvisorRequest, current_user=Depends
     
     data = req.dict()
     result = await get_investment_recommendations(data)
+    return result
+
+
+@router.post("/emergency")
+async def emergency_advisor(req: EmergencyAdvisorRequest, current_user=Depends(get_current_user)):
+    """Emergency Advisor - Auto-fetches user's financial data"""
+    db = get_db()
+    user_id = current_user["id"]
+    
+    # Build complete request with user's financial data already included
+    data = req.dict()
+    
+    # The frontend should already include user_financial_data, but if not, we can fetch here
+    if not data.get('user_financial_data'):
+        # Get user's income from settings
+        settings = await db.settings.find_one({"user_id": user_id})
+        income = settings.get("income_baseline", 0) if settings else 0
+        
+        # Get user's current savings/balance
+        balance_data = await db.settings.find_one({"user_id": user_id})
+        savings = balance_data.get("bank_balance", 0) if balance_data else 0
+        
+        # Get monthly expenses
+        month = current_month()
+        expense_res = await db.transactions.aggregate([
+            {"$match": {"user_id": user_id, "month": month, "category_type": "expense", "status": "categorized"}},
+            {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+        ]).to_list(1)
+        expenses = expense_res[0]["total"] if expense_res else 0
+        
+        # Get assets
+        assets = await db.assets.find({"user_id": user_id}).to_list(100)
+        
+        data['user_financial_data'] = {
+            "monthly_income": income,
+            "monthly_expenses": expenses,
+            "current_savings": savings,
+            "assets": [{"name": a.get("name"), "type": a.get("asset_type"), "value": a.get("current_value", 0)} for a in assets]
+        }
+    
+    result = await get_emergency_recovery_plan(data)
     return result
 
 
