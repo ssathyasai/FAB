@@ -171,7 +171,7 @@ async def emergency_advisor(req: EmergencyAdvisorRequest, current_user=Depends(g
     data["income"] = income
     data["monthly_expenses"] = monthly_expenses
     data["savings"] = savings
-    data["assets"] = [{"name": a.get("name"), "type": a.get("type"), "value": a.get("current_value", a.get("value", 0))} for a in assets]
+    data["assets"] = [{"name": a.get("name"), "type": a.get("asset_type"), "value": a.get("current_value", a.get("value", 0))} for a in assets]
     
     # Add user context to emergency details
     if "emergency_details" not in data:

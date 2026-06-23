@@ -695,7 +695,7 @@ def _rule_based_emergency(req: dict) -> dict:
     emergency_type = req.get('emergency_type', 'Unknown')
     income = req.get('income', 0)
     details = req.get('emergency_details', {})
-    savings = float(details.get('savings', 0))
+    savings = float(req.get('savings', details.get('available_savings', details.get('savings', 0))))
     
     # Determine severity
     monthly_expenses = details.get('monthly_expenses', income * 0.6)
@@ -705,6 +705,77 @@ def _rule_based_emergency(req: dict) -> dict:
         severity = "High"
     else:
         severity = "Moderate"
+        
+    # Build asset_liquidation dynamically from actual user assets
+    user_assets = req.get('assets', [])
+    asset_liquidation = []
+    for asset in user_assets:
+        asset_name = asset.get("name", "Asset")
+        asset_type = asset.get("type", "Other")
+        value = asset.get("value", 0)
+        
+        # Determine liquidation advice based on type
+        how_to_sell = f"Liquidate your {asset_name} ({asset_type}) worth ₹{value:,.0f}."
+        where_to_sell = []
+        
+        type_lower = str(asset_type).lower()
+        if "gold" in type_lower or "silver" in type_lower or "jewelry" in type_lower:
+            how_to_sell = f"Sell or take a loan against your {asset_name}. Muthoot or local jewelers offer instant cash."
+            where_to_sell = [
+                "Muthoot Finance / Manappuram Gold Loan",
+                "Tanishq Gold Exchange",
+                "Local reputed jewelry showroom",
+                "Rupeek (doorstep gold loan service)"
+            ]
+        elif "stock" in type_lower or "share" in type_lower or "equity" in type_lower:
+            how_to_sell = f"Sell your {asset_name} shares during trading hours. Funds will settle in T+2 days."
+            where_to_sell = [
+                "Zerodha Kite / Groww / Upstox app",
+                "Angel One / ICICI Direct portal",
+                "Your registered stock broker"
+            ]
+        elif "mutual" in type_lower or "fund" in type_lower:
+            how_to_sell = f"Redeem your {asset_name} mutual fund units. Debt funds take 1-2 days, equity 3-4 days."
+            where_to_sell = [
+                "Groww / Coin by Zerodha / Kuvera app",
+                "Direct AMC website (HDFC, ICICI, etc.)",
+                "MF Utility platform"
+            ]
+        elif "fd" in type_lower or "fixed deposit" in type_lower or "deposit" in type_lower:
+            how_to_sell = f"Prematurely close your {asset_name} FD. A small 0.5-1% penalty may apply, but funds are credited instantly."
+            where_to_sell = [
+                "Internet banking portal → Fixed Deposits",
+                "Bank's mobile application",
+                "Visit your bank branch with receipt"
+            ]
+        elif "house" in type_lower or "land" in type_lower or "property" in type_lower or "real estate" in type_lower:
+            how_to_sell = f"Property liquidation takes 3-6 months. Consider a Loan Against Property (LAP) for urgent needs."
+            where_to_sell = [
+                "Apply for Loan Against Property (LAP) at your bank",
+                "List on MagicBricks / 99acres (for outright sale)",
+                "Contact local real estate consultants"
+            ]
+        elif "vehicle" in type_lower or "car" in type_lower or "bike" in type_lower:
+            how_to_sell = f"Sell your {asset_name} to used car dealers for instant payout within 24-48 hours."
+            where_to_sell = [
+                "Cars24 / Spinny / Olx Auto",
+                "Local pre-owned vehicle dealer",
+                "List on OLX / Facebook Marketplace"
+            ]
+        else:
+            how_to_sell = f"Liquidate or sell your {asset_name} ({asset_type}) for emergency funding."
+            where_to_sell = [
+                "OLX / online classifieds",
+                "Local market dealers",
+                "Inquire about loan against this asset type"
+            ]
+            
+        asset_liquidation.append({
+            "asset_type": f"{asset_name} ({asset_type})",
+            "expected_value": f"₹{value:,.0f}",
+            "how_to_sell": how_to_sell,
+            "where_to_sell": where_to_sell
+        })
     
     return {
         "financial_summary": {
@@ -777,68 +848,7 @@ def _rule_based_emergency(req: dict) -> dict:
                 "interest_rate": "Usually interest-free"
             }
         ],
-        "asset_liquidation": [
-            {
-                "asset_type": "Fixed Deposit (FD)",
-                "expected_value": "Full FD amount minus penalty",
-                "how_to_sell": "Break FD online via net banking or visit branch. Penalty: Loss of 1% interest. Get money same day.",
-                "where_to_sell": [
-                    "Your bank's mobile app - FD section → Break FD",
-                    "Net banking - Fixed Deposits tab → Premature withdrawal",
-                    "Visit bank branch with FD receipt and ID",
-                    "Call customer care number for online FD break",
-                    "Money credited to account within hours"
-                ]
-            },
-            {
-                "asset_type": "Gold Jewelry",
-                "expected_value": "₹6,000-6,500 per gram (current rate)",
-                "how_to_sell": "Visit gold buyers with jewelry. Get 3 quotes before selling. Carry purchase bill if available.",
-                "where_to_sell": [
-                    "Tanishq Goldexchange - Buyback at any Tanishq store",
-                    "Muthoot Finance - Gold buying counter at branches",
-                    "Manappuram - Gold purchase service",
-                    "Local trusted jewelry shops - Get competitive quotes",
-                    "PaytmMoney Gold - Online selling (for digital gold only)"
-                ]
-            },
-            {
-                "asset_type": "Mutual Funds",
-                "expected_value": "Current NAV value of units",
-                "how_to_sell": "Redeem units online. Money in 3-4 business days for equity, 1-2 days for debt/liquid funds.",
-                "where_to_sell": [
-                    "Zerodha Coin - Mutual funds section → Redeem",
-                    "Groww App - Holdings → Select fund → Redeem",
-                    "PaytmMoney - Mutual funds → Redeem",
-                    "Fund house website (e.g., HDFC MF, ICICI Prudential MF)",
-                    "Your bank's MF portal - Mutual funds section"
-                ]
-            },
-            {
-                "asset_type": "Stocks/Shares",
-                "expected_value": "Current market price",
-                "how_to_sell": "Sell during market hours (9:15 AM - 3:30 PM). Money in T+2 days (2 working days).",
-                "where_to_sell": [
-                    "Zerodha Kite App - Holdings → Sell",
-                    "Groww Stocks - Portfolio → Sell",
-                    "Upstox App - Holdings section",
-                    "Angel One App - Portfolio → Sell",
-                    "ICICI Direct / HDFC Securities apps"
-                ]
-            },
-            {
-                "asset_type": "PPF/EPF (Partial Withdrawal)",
-                "expected_value": "Up to 50% of balance (if eligible)",
-                "how_to_sell": "Partial withdrawal allowed after 5 years for medical/education/home. Full withdrawal at maturity only.",
-                "where_to_sell": [
-                    "PPF: Visit bank/post office with passbook and withdrawal form",
-                    "EPF: Apply online via EPFO portal - Partial withdrawal",
-                    "Submit necessary documents (medical bills, etc.)",
-                    "Processing takes 7-15 days",
-                    "For emergencies, contact EPFO helpline"
-                ]
-            }
-        ],
+        "asset_liquidation": asset_liquidation,
         "recommendations": [
             "Priority order: Use savings → Break FD/Liquidate investments → Take loan → Sell assets",
             "Gold loan is better than selling gold - you can reclaim it later",
