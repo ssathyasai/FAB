@@ -213,70 +213,71 @@ export default function EmergencyAdvisor() {
   };
 
   return (
-    <div style={{ display: "flex", gap: "1.5rem", height: "calc(100vh - 120px)" }}>
-      {/* Left Panel - Input */}
-      <div style={{ width: "380px", display: "flex", flexDirection: "column" }}>
-        <div className="card" style={{ padding: "1.5rem", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <h3 style={{ fontWeight: 700, marginBottom: "1rem", fontSize: "1.1rem" }}>🆘 Emergency Recovery</h3>
-          
-          {/* Financial Summary Card */}
-          {!financialData.loading && (
-            <div style={{ 
-              padding: "0.8rem", 
-              background: "rgba(239,68,68,0.1)", 
-              borderRadius: "0.5rem",
-              border: "1px solid rgba(239,68,68,0.3)",
-              marginBottom: "1rem"
-            }}>
-              <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: "0.5rem" }}>
-                YOUR FINANCIAL STATUS
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "0.75rem" }}>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Income:</span>{" "}
-                  <span style={{ color: "#34d399", fontWeight: 600 }}>₹{financialData.income.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Expenses:</span>{" "}
-                  <span style={{ color: "#f59e0b", fontWeight: 600 }}>₹{financialData.expenses.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Savings:</span>{" "}
-                  <span style={{ color: "#3b82f6", fontWeight: 600 }}>₹{financialData.savings.toLocaleString()}</span>
-                </div>
-                <div>
-                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Assets:</span>{" "}
-                  <span style={{ color: "#a78bfa", fontWeight: 600 }}>{financialData.assets} items</span>
-                </div>
-              </div>
-              <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem" }}>
-                ✓ Auto-loaded from your profile
-              </div>
+    <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+      {/* Financial Summary Card - Top */}
+      {!financialData.loading && !result && (
+        <div className="card" style={{ 
+          padding: "1.2rem", 
+          background: "linear-gradient(135deg, rgba(239,68,68,0.1), rgba(251,146,60,0.05))", 
+          borderRadius: "1rem",
+          border: "1px solid rgba(239,68,68,0.3)",
+          marginBottom: "1.5rem"
+        }}>
+          <div style={{ fontSize: "0.75rem", fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: "0.8rem", textTransform: "uppercase", letterSpacing: "0.5px" }}>
+            📊 Your Financial Status
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "1rem" }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.5)", marginBottom: "0.3rem" }}>Monthly Income</div>
+              <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#34d399" }}>₹{financialData.income.toLocaleString()}</div>
             </div>
-          )}
-          
-          <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.5)", marginBottom: "0.3rem" }}>Monthly Expenses</div>
+              <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#f59e0b" }}>₹{financialData.expenses.toLocaleString()}</div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.5)", marginBottom: "0.3rem" }}>Available Savings</div>
+              <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#3b82f6" }}>₹{financialData.savings.toLocaleString()}</div>
+            </div>
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.5)", marginBottom: "0.3rem" }}>Assets</div>
+              <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#a78bfa" }}>{financialData.assets} items</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Main Card */}
+      <div className="card" style={{ padding: "2rem" }}>
+        {!result ? (
+          <>
+            <h3 style={{ fontWeight: 700, marginBottom: "0.5rem", fontSize: "1.3rem" }}>🆘 Emergency Recovery Advisor</h3>
+            <p style={{ color: "rgba(255,255,255,0.6)", fontSize: "0.85rem", marginBottom: "2rem" }}>
+              Select your emergency type and provide details to get an immediate action plan
+            </p>
+            
             {/* Emergency Type Selection */}
-            <div>
-              <label style={{ fontSize: "0.7rem", fontWeight: 600, color: "rgba(255,255,255,0.5)", display: "block", marginBottom: 8 }}>
-                SELECT EMERGENCY TYPE
+            <div style={{ marginBottom: "2rem" }}>
+              <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", display: "block", marginBottom: "1rem" }}>
+                Step 1: Select Emergency Type
               </label>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "0.8rem" }}>
                 {EMERGENCY_TYPES.map(type => (
                   <button 
                     key={type} 
-                    onClick={() => { setEmergencyType(type); setDetails({}); setResult(null); }} 
+                    onClick={() => { setEmergencyType(type); setDetails({}); }} 
                     style={{
-                      padding: "0.7rem 1rem", 
-                      borderRadius: "0.5rem", 
-                      textAlign: "left",
+                      padding: "1rem", 
+                      borderRadius: "0.75rem", 
+                      textAlign: "center",
                       border: emergencyType === type ? "2px solid #ef4444" : "1px solid rgba(255,255,255,0.1)",
-                      background: emergencyType === type ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.02)",
+                      background: emergencyType === type ? "rgba(239,68,68,0.15)" : "rgba(255,255,255,0.03)",
                       color: emergencyType === type ? "#ef4444" : "rgba(255,255,255,0.7)",
                       cursor: "pointer", 
-                      fontSize: "0.85rem", 
-                      fontWeight: emergencyType === type ? 600 : 400,
-                      transition: "all 0.2s"
+                      fontSize: "0.9rem", 
+                      fontWeight: emergencyType === type ? 600 : 500,
+                      transition: "all 0.2s",
+                      boxShadow: emergencyType === type ? "0 0 0 3px rgba(239,68,68,0.1)" : "none"
                     }}
                   >
                     {type}
@@ -287,14 +288,14 @@ export default function EmergencyAdvisor() {
 
             {/* Dynamic Questions */}
             {emergencyType && (
-              <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1rem" }}>
-                <label style={{ fontSize: "0.7rem", fontWeight: 600, color: "#ef4444", display: "block", marginBottom: 12 }}>
-                  EMERGENCY DETAILS
+              <div style={{ marginBottom: "2rem" }}>
+                <label style={{ fontSize: "0.85rem", fontWeight: 600, color: "rgba(255,255,255,0.8)", display: "block", marginBottom: "1rem" }}>
+                  Step 2: Provide Emergency Details
                 </label>
-                <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1rem" }}>
                   {getQuestions().map(q => (
                     <div key={q.key}>
-                      <label style={{ fontSize: "0.7rem", color: "rgba(255,255,255,0.5)", display: "block", marginBottom: 4 }}>
+                      <label style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)", display: "block", marginBottom: 6 }}>
                         {q.label}
                       </label>
                       <input 
@@ -303,157 +304,276 @@ export default function EmergencyAdvisor() {
                         placeholder={q.label}
                         value={details[q.key] || ""} 
                         onChange={e => setDetails(d => ({ ...d, [q.key]: e.target.value }))} 
-                        style={{ padding: "0.6rem", fontSize: "0.85rem", width: "100%" }}
+                        style={{ padding: "0.75rem", fontSize: "0.9rem", width: "100%" }}
                       />
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* Submit Button */}
-          {emergencyType && (
+            {/* Submit Button */}
+            {emergencyType && (
+              <button 
+                className="btn-primary" 
+                style={{ 
+                  padding: "1rem", 
+                  fontSize: "1rem", 
+                  fontWeight: 600, 
+                  background: "linear-gradient(135deg, #ef4444, #dc2626)",
+                  width: "100%",
+                  borderRadius: "0.75rem"
+                }} 
+                onClick={handleSubmit} 
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <i className="fas fa-spinner fa-spin" style={{ marginRight: "0.5rem" }} />
+                    Analyzing Your Situation...
+                  </>
+                ) : (
+                  <>
+                    <i className="fas fa-bolt" style={{ marginRight: "0.5rem" }} />
+                    Get My Recovery Plan
+                  </>
+                )}
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            {/* Back Button */}
             <button 
-              className="btn-primary" 
-              style={{ padding: "0.8rem", marginTop: "1rem", fontSize: "0.9rem", fontWeight: 600, background: "#ef4444" }} 
-              onClick={handleSubmit} 
-              disabled={loading}
+              onClick={() => { setResult(null); setEmergencyType(""); setDetails({}); }}
+              style={{
+                padding: "0.6rem 1.2rem",
+                borderRadius: "0.5rem",
+                border: "1px solid rgba(255,255,255,0.1)",
+                background: "rgba(255,255,255,0.05)",
+                color: "rgba(255,255,255,0.7)",
+                cursor: "pointer",
+                fontSize: "0.85rem",
+                marginBottom: "1.5rem",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "0.5rem"
+              }}
             >
-              {loading ? "🔄 Analyzing..." : "💡 Get Recovery Plan"}
+              <i className="fas fa-arrow-left" />
+              Start New Emergency Analysis
             </button>
-          )}
-        </div>
-      </div>
 
-      {/* Right Panel - Results */}
-      {result && (
-        <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
-          {/* Severity Badge */}
-          <div className="card" style={{ 
-            padding: "1rem", 
-            background: result.severity === "Critical" ? "rgba(239,68,68,0.1)" : result.severity === "High" ? "rgba(251,146,60,0.1)" : "rgba(234,179,8,0.1)",
-            border: `2px solid ${result.severity === "Critical" ? "#ef4444" : result.severity === "High" ? "#fb923c" : "#eab308"}`
-          }}>
-            <div style={{ fontSize: "0.9rem", fontWeight: 700, color: result.severity === "Critical" ? "#ef4444" : result.severity === "High" ? "#fb923c" : "#eab308" }}>
-              🚨 Severity: {result.severity}
-            </div>
-          </div>
-
-          {/* Immediate Actions */}
-          {result.immediate_actions && result.immediate_actions.length > 0 && (
-            <div className="card" style={{ padding: "1.2rem", borderLeft: "3px solid #ef4444" }}>
-              <h4 style={{ fontWeight: 700, marginBottom: "0.8rem", fontSize: "0.95rem", color: "#ef4444" }}>
-                ⚡ IMMEDIATE ACTIONS (Next 24-48 Hours)
-              </h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {result.immediate_actions.map((action: string, i: number) => (
-                  <div key={i} style={{ 
-                    padding: "0.7rem", 
-                    background: "rgba(239,68,68,0.05)", 
-                    borderLeft: "3px solid #ef4444",
-                    borderRadius: "0.3rem"
-                  }}>
-                    <span style={{ color: "#ef4444", fontWeight: 700, marginRight: "0.5rem" }}>{i + 1}.</span>
-                    <span style={{ color: "rgba(255,255,255,0.8)", fontSize: "0.85rem" }}>{action}</span>
+            {/* Severity Badge */}
+            <div style={{ 
+              padding: "1.2rem", 
+              background: result.severity === "Critical" ? "rgba(239,68,68,0.15)" : result.severity === "High" ? "rgba(251,146,60,0.15)" : "rgba(234,179,8,0.15)",
+              border: `2px solid ${result.severity === "Critical" ? "#ef4444" : result.severity === "High" ? "#fb923c" : "#eab308"}`,
+              borderRadius: "0.75rem",
+              marginBottom: "1.5rem"
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                <div style={{ 
+                  fontSize: "2rem",
+                  color: result.severity === "Critical" ? "#ef4444" : result.severity === "High" ? "#fb923c" : "#eab308"
+                }}>
+                  {result.severity === "Critical" ? "🚨" : result.severity === "High" ? "⚠️" : "📋"}
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.5)", marginBottom: "0.2rem" }}>EMERGENCY SEVERITY</div>
+                  <div style={{ fontSize: "1.2rem", fontWeight: 700, color: result.severity === "Critical" ? "#ef4444" : result.severity === "High" ? "#fb923c" : "#eab308" }}>
+                    {result.severity}
                   </div>
-                ))}
+                </div>
               </div>
             </div>
-          )}
 
-          {/* Funding Options */}
-          {result.funding_options && result.funding_options.length > 0 && (
-            <div className="card" style={{ padding: "1.2rem", borderLeft: "3px solid #34d399" }}>
-              <h4 style={{ fontWeight: 700, marginBottom: "0.8rem", fontSize: "0.95rem", color: "#34d399" }}>
-                💰 FUNDING OPTIONS
-              </h4>
-              {result.funding_options.map((option: any, i: number) => (
-                <div key={i} style={{ 
-                  marginBottom: "1rem", 
-                  padding: "0.8rem", 
-                  background: "rgba(52,211,153,0.05)",
-                  borderRadius: "0.5rem",
-                  border: "1px solid rgba(52,211,153,0.2)"
+            {/* Results Grid */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "1.5rem" }}>
+
+
+              {/* Immediate Actions */}
+              {result.immediate_actions && result.immediate_actions.length > 0 && (
+                <div style={{ 
+                  padding: "1.5rem", 
+                  background: "rgba(239,68,68,0.05)",
+                  borderRadius: "0.75rem",
+                  border: "2px solid rgba(239,68,68,0.3)"
                 }}>
-                  <div style={{ fontWeight: 700, color: "#34d399", marginBottom: "0.4rem", fontSize: "0.9rem" }}>
-                    {i + 1}. {option.option}
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1rem" }}>
+                    <div style={{ fontSize: "1.5rem" }}>⚡</div>
+                    <h4 style={{ fontWeight: 700, fontSize: "1.1rem", color: "#ef4444", margin: 0 }}>
+                      Immediate Actions (Next 24-48 Hours)
+                    </h4>
                   </div>
-                  <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.85rem", marginBottom: "0.5rem" }}>
-                    {option.description}
+                  <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                    {result.immediate_actions.map((action: string, i: number) => (
+                      <div key={i} style={{ 
+                        padding: "1rem", 
+                        background: "rgba(239,68,68,0.08)", 
+                        borderLeft: "4px solid #ef4444",
+                        borderRadius: "0.5rem",
+                        display: "flex",
+                        gap: "1rem"
+                      }}>
+                        <div style={{ 
+                          width: "28px",
+                          height: "28px",
+                          borderRadius: "50%",
+                          background: "#ef4444",
+                          color: "white",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: "0.85rem",
+                          fontWeight: 700,
+                          flexShrink: 0
+                        }}>
+                          {i + 1}
+                        </div>
+                        <span style={{ color: "rgba(255,255,255,0.85)", fontSize: "0.9rem", lineHeight: "1.6" }}>{action}</span>
+                      </div>
+                    ))}
                   </div>
-                  {option.steps && option.steps.length > 0 && (
-                    <div style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.6)" }}>
-                      {option.steps.map((step: string, j: number) => (
-                        <div key={j} style={{ marginBottom: "0.2rem" }}>• {step}</div>
+                </div>
+              )}
+
+
+              {/* Funding Options */}
+              {result.funding_options && result.funding_options.length > 0 && (
+                <div style={{ 
+                  padding: "1.5rem", 
+                  background: "rgba(52,211,153,0.05)",
+                  borderRadius: "0.75rem",
+                  border: "2px solid rgba(52,211,153,0.3)"
+                }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1rem" }}>
+                    <div style={{ fontSize: "1.5rem" }}>💰</div>
+                    <h4 style={{ fontWeight: 700, fontSize: "1.1rem", color: "#34d399", margin: 0 }}>
+                      Funding Options
+                    </h4>
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(300px, 1fr))", gap: "1rem" }}>
+                    {result.funding_options.map((option: any, i: number) => (
+                      <div key={i} style={{ 
+                        padding: "1.2rem", 
+                        background: "rgba(52,211,153,0.08)",
+                        borderRadius: "0.75rem",
+                        border: "1px solid rgba(52,211,153,0.2)"
+                      }}>
+                        <div style={{ fontWeight: 700, color: "#34d399", marginBottom: "0.6rem", fontSize: "1rem" }}>
+                          {option.option}
+                        </div>
+                        <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.85rem", marginBottom: "0.8rem", lineHeight: "1.5" }}>
+                          {option.description}
+                        </div>
+                        {option.steps && option.steps.length > 0 && (
+                          <div style={{ fontSize: "0.8rem", color: "rgba(255,255,255,0.6)", marginBottom: "0.8rem" }}>
+                            {option.steps.map((step: string, j: number) => (
+                              <div key={j} style={{ marginBottom: "0.3rem", display: "flex", gap: "0.5rem" }}>
+                                <span>•</span>
+                                <span>{step}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {option.timeline && (
+                          <div style={{ 
+                            display: "inline-block",
+                            padding: "0.4rem 0.8rem",
+                            background: "rgba(59,130,246,0.15)",
+                            borderRadius: "0.5rem",
+                            fontSize: "0.75rem", 
+                            color: "#3b82f6", 
+                            fontWeight: 600 
+                          }}>
+                            ⏱️ {option.timeline}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+
+              {/* Recovery Timeline & Recommendations */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+                {/* Recovery Timeline */}
+                {result.recovery_timeline && (
+                  <div style={{ 
+                    padding: "1.5rem", 
+                    background: "rgba(99,102,241,0.05)",
+                    borderRadius: "0.75rem",
+                    border: "2px solid rgba(99,102,241,0.3)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1rem" }}>
+                      <div style={{ fontSize: "1.5rem" }}>🗓️</div>
+                      <h4 style={{ fontWeight: 700, fontSize: "1.1rem", color: "#6366f1", margin: 0 }}>
+                        Recovery Timeline
+                      </h4>
+                    </div>
+                    {Object.entries(result.recovery_timeline).map(([period, actions]: [string, any]) => (
+                      <div key={period} style={{ marginBottom: "1rem" }}>
+                        <div style={{ 
+                          fontSize: "0.8rem", 
+                          fontWeight: 600, 
+                          color: "#6366f1", 
+                          marginBottom: "0.5rem",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.5px"
+                        }}>
+                          {period.replace(/_/g, ' ')}
+                        </div>
+                        {actions.map((action: string, i: number) => (
+                          <div key={i} style={{ 
+                            color: "rgba(255,255,255,0.65)", 
+                            fontSize: "0.8rem", 
+                            marginBottom: "0.4rem",
+                            paddingLeft: "1rem",
+                            lineHeight: "1.5"
+                          }}>
+                            • {action}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Key Recommendations */}
+                {result.key_recommendations && result.key_recommendations.length > 0 && (
+                  <div style={{ 
+                    padding: "1.5rem", 
+                    background: "rgba(168,85,247,0.05)",
+                    borderRadius: "0.75rem",
+                    border: "2px solid rgba(168,85,247,0.3)"
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.8rem", marginBottom: "1rem" }}>
+                      <div style={{ fontSize: "1.5rem" }}>💡</div>
+                      <h4 style={{ fontWeight: 700, fontSize: "1.1rem", color: "#a855f7", margin: 0 }}>
+                        Key Recommendations
+                      </h4>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
+                      {result.key_recommendations.map((rec: string, i: number) => (
+                        <div key={i} style={{ 
+                          padding: "0.8rem", 
+                          background: "rgba(168,85,247,0.08)",
+                          borderLeft: "3px solid #a855f7",
+                          borderRadius: "0.5rem"
+                        }}>
+                          <span style={{ color: "rgba(255,255,255,0.75)", fontSize: "0.85rem", lineHeight: "1.6" }}>{rec}</span>
+                        </div>
                       ))}
                     </div>
-                  )}
-                  {option.timeline && (
-                    <div style={{ fontSize: "0.75rem", color: "#3b82f6", marginTop: "0.4rem", fontWeight: 600 }}>
-                      ⏱️ {option.timeline}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Recovery Timeline */}
-          {result.recovery_timeline && (
-            <div className="card" style={{ padding: "1.2rem" }}>
-              <h4 style={{ fontWeight: 700, marginBottom: "0.8rem", fontSize: "0.95rem" }}>
-                🗓️ Recovery Timeline
-              </h4>
-              {Object.entries(result.recovery_timeline).map(([period, actions]: [string, any]) => (
-                <div key={period} style={{ marginBottom: "0.8rem" }}>
-                  <div style={{ 
-                    fontSize: "0.8rem", 
-                    fontWeight: 600, 
-                    color: "#6366f1", 
-                    marginBottom: "0.4rem",
-                    textTransform: "uppercase"
-                  }}>
-                    {period.replace(/_/g, ' ')}
                   </div>
-                  {actions.map((action: string, i: number) => (
-                    <div key={i} style={{ 
-                      color: "rgba(255,255,255,0.6)", 
-                      fontSize: "0.75rem", 
-                      marginBottom: "0.2rem",
-                      paddingLeft: "0.8rem"
-                    }}>
-                      • {action}
-                    </div>
-                  ))}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Key Recommendations */}
-          {result.key_recommendations && result.key_recommendations.length > 0 && (
-            <div className="card" style={{ padding: "1.2rem" }}>
-              <h4 style={{ fontWeight: 700, marginBottom: "0.8rem", fontSize: "0.95rem" }}>
-                💡 Key Recommendations
-              </h4>
-              <div style={{ display: "flex", flexDirection: "column", gap: "0.6rem" }}>
-                {result.key_recommendations.map((rec: string, i: number) => (
-                  <div key={i} style={{ 
-                    padding: "0.7rem", 
-                    background: "rgba(255,255,255,0.02)",
-                    borderLeft: "3px solid #6366f1",
-                    borderRadius: "0.3rem"
-                  }}>
-                    <span style={{ color: "#6366f1", fontWeight: 700, marginRight: "0.5rem" }}>{i + 1}.</span>
-                    <span style={{ color: "rgba(255,255,255,0.7)", fontSize: "0.85rem" }}>{rec}</span>
-                  </div>
-                ))}
+                )}
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
