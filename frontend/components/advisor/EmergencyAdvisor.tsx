@@ -1,6 +1,8 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { postEmergencyAdvisor } from "@/lib/api";
+import { api } from "@/lib/api";
+import toast from "react-hot-toast";
 
 const EMERGENCY_TYPES = [
   "Medical Emergency",
@@ -20,14 +22,103 @@ export default function EmergencyAdvisor() {
   const [details, setDetails] = useState<Record<string, string>>({});
   const [result, setResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  
+  // Auto-fetch user's financial data
+  const [userData, setUserData] = useState<any>({
+    assets: [],
+    income: 0,
+    expenses: 0,
+    savings: 0,
+    loading: true
+  });
+
+  useEffect(() => {
+    fetchUserFinancialData();
+  }, []);
+
+  const fetchUserFinancialData = async () => {
+    try {
+      setUserData(prev => ({ ...prev, loading: true }));
+      
+      // Fetch assets
+      const assetsRes = await api.get("/api/assets");
+      const assets = assetsRes.data.assets || [];
+      
+      // Fetch budget/income from settings
+      const settingsRes = await api.get("/api/settings");
+      const income = settingsRes.data.income_baseline || 0;
+      
+      // Fetch current month budget to get expenses
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      let expenses = 0;
+      try {
+        const budgetRes = await api.get(`/api/budget?month=${currentMonth}`);
+        if (budgetRes.data.budget) {
+          expenses = budgetRes.data.budget.categories?.reduce((sum: number, cat: any) => sum + (cat.spent || 0), 0) || 0;
+        }
+      } catch (e) {
+        console.log("No budget data yet, expenses will be 0");
+      }
+      
+      // Fetch bank balance (savings)
+      const balanceRes = await api.get("/api/balance");
+      const savings = balanceRes.data.balance || 0;
+      
+      setUserData({
+        assets,
+        income,
+        expenses,
+        savings,
+        loading: false
+      });
+      
+      console.log("[Emergency Advisor] Financial data loaded:", { income, expenses, savings, assets: assets.length });
+    } catch (error) {
+      console.error("Failed to fetch user data:", error);
+      toast.error("Failed to load your financial data. Using defaults.");
+      setUserData({ assets: [], income: 0, expenses: 0, savings: 0, loading: false });
+    }
+  };
 
   const submit = async () => {
+    // Validate all required fields are filled
+    const fields = getFields();
+    const missingFields = fields.filter(([key]) => !details[key] || String(details[key]).trim() === "");
+    
+    if (missingFields.length > 0) {
+      toast.error(`Please fill all required fields: ${missingFields.map(([_, label]) => label).join(", ")}`);
+      return;
+    }
+    
     setLoading(true);
     try {
-      const r = await postEmergencyAdvisor({ emergency_type: eType, emergency_details: details });
+      // Prepare enhanced payload with user's financial data
+      const payload = {
+        emergency_type: eType,
+        emergency_details: details,
+        user_financial_data: {
+          assets: userData.assets.map((a: any) => ({
+            type: a.asset_type,
+            name: a.name,
+            current_value: a.current_value,
+            purchase_value: a.purchase_value
+          })),
+          monthly_income: userData.income,
+          monthly_expenses: userData.expenses,
+          current_savings: userData.savings,
+          total_assets_value: userData.assets.reduce((sum: number, a: any) => sum + (a.current_value || 0), 0)
+        }
+      };
+      
+      console.log("[Emergency Advisor] Submitting with payload:", payload);
+      
+      const r = await postEmergencyAdvisor(payload);
       setResult(r.data);
-    } catch (e) {
-      console.error(e);
+      toast.success("Emergency recovery plan generated!");
+    } catch (e: any) {
+      console.error("Emergency advisor error:", e);
+      const errorMsg = e.response?.data?.detail || e.message || "Failed to get emergency advice";
+      toast.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -35,64 +126,72 @@ export default function EmergencyAdvisor() {
 
   const getFields = (): Field[] => {
     if (eType === "Job Loss") return [
-      ["emi_amount", "Total Monthly EMI/Loans (₹)", "number"],
-      ["severance", "Severance Package Received (₹)", "number"],
-      ["job_search_months", "Expected Job Search Duration (months)", "number"],
-      ["has_insurance", "Health Insurance? (Yes/No)", "text"],
+      ["emi_amount", "Total Monthly EMI/Loan Payments (₹)", "number"],
+      ["severance_package", "Severance Package Received (₹)", "number"],
+      ["job_search_duration", "Expected Job Search Duration (months)", "number"],
+      ["has_health_insurance", "Do you have Health Insurance? (Yes/No)", "text"],
+      ["dependents", "Number of Dependents", "number"],
     ];
     
     if (eType === "Medical Emergency") return [
-      ["patient", "Patient Relation (Self/Parent/Spouse/Child)", "text"],
-      ["diagnosis", "Medical Condition/Diagnosis", "text"],
-      ["total_cost", "Total Medical Cost Estimate (₹)", "number"],
-      ["insurance_covered", "Amount Insurance Will Cover (₹)", "number"],
-      ["urgency", "When is Money Needed? (Immediate/1 Week/1 Month)", "text"],
+      ["patient_relation", "Patient (Self/Parent/Spouse/Child)", "text"],
+      ["medical_condition", "Medical Condition/Diagnosis", "text"],
+      ["total_medical_cost", "Total Medical Cost Required (₹)", "number"],
+      ["insurance_coverage", "Insurance Will Cover (₹)", "number"],
+      ["urgency", "When is Money Needed? (Immediate/This Week/This Month)", "text"],
+      ["hospital_name", "Hospital/Treatment Center", "text"],
     ];
     
     if (eType === "Business Loss") return [
-      ["business_type", "Business Type", "text"],
-      ["loss_amount", "Total Loss Amount (₹)", "number"],
-      ["business_loans", "Business Loans Outstanding (₹)", "number"],
+      ["business_type", "Type of Business", "text"],
+      ["loss_amount", "Total Loss/Damage Amount (₹)", "number"],
+      ["business_loans", "Outstanding Business Loans (₹)", "number"],
       ["can_recover", "Can Business Recover? (Yes/No/Uncertain)", "text"],
-      ["recovery_months", "Recovery Timeline (months)", "number"],
+      ["recovery_timeline", "Expected Recovery Timeline (months)", "number"],
+      ["employees", "Number of Employees Affected", "number"],
     ];
     
     if (eType === "Home Damage") return [
       ["damage_type", "Type of Damage (Fire/Water/Earthquake/Storm)", "text"],
       ["repair_cost", "Estimated Repair Cost (₹)", "number"],
-      ["insurance_claim", "Insurance Claim Applied For (₹)", "number"],
-      ["urgency", "Repair Urgency (Immediate/Can Wait 1 Month)", "text"],
-      ["alternate_living", "Need Temporary Stay? (Yes/No)", "text"],
+      ["insurance_claim", "Insurance Claim Amount Applied (₹)", "number"],
+      ["repair_urgency", "Repair Urgency (Immediate/This Week/This Month)", "text"],
+      ["temporary_stay_needed", "Need Temporary Accommodation? (Yes/No)", "text"],
+      ["family_members", "Number of Family Members Affected", "number"],
     ];
     
     if (eType === "Accident") return [
-      ["accident_type", "Accident Type (Vehicle/Personal Injury)", "text"],
-      ["medical_cost", "Medical Treatment Cost (₹)", "number"],
-      ["vehicle_damage", "Vehicle/Property Damage (₹)", "number"],
-      ["insurance_covered", "Insurance Will Cover (₹)", "number"],
-      ["income_loss_months", "Income Loss Duration (months)", "number"],
+      ["accident_type", "Accident Type (Vehicle/Personal Injury/Both)", "text"],
+      ["medical_expenses", "Medical Treatment Cost (₹)", "number"],
+      ["vehicle_damage_cost", "Vehicle/Property Damage (₹)", "number"],
+      ["insurance_coverage", "Insurance Will Cover (₹)", "number"],
+      ["income_loss_duration", "Unable to Work Duration (months)", "number"],
+      ["accident_date", "When did it happen? (e.g., Yesterday, Last Week)", "text"],
     ];
     
     if (eType === "Family Emergency") return [
-      ["emergency_type", "Emergency Type", "text"],
-      ["amount_needed", "Total Amount Needed (₹)", "number"],
-      ["urgency", "How Urgent (Days/Weeks)", "text"],
-      ["family_support", "Family Can Contribute (₹)", "number"],
+      ["emergency_description", "Brief Description of Emergency", "text"],
+      ["amount_needed", "Total Amount Required (₹)", "number"],
+      ["urgency", "How Urgent? (Immediate/Days/Weeks)", "text"],
+      ["family_contribution", "Family Can Contribute (₹)", "number"],
+      ["location", "Location (Same City/Different State/International)", "text"],
     ];
     
     if (eType === "Legal Issue") return [
-      ["issue_type", "Legal Issue Type", "text"],
-      ["lawyer_cost", "Lawyer Fees (₹)", "number"],
-      ["case_duration", "Case Duration (months)", "number"],
-      ["settlement", "Settlement Amount if any (₹)", "number"],
+      ["legal_issue_type", "Type of Legal Issue", "text"],
+      ["lawyer_fees", "Lawyer/Legal Fees (₹)", "number"],
+      ["case_duration", "Expected Case Duration (months)", "number"],
+      ["court_fees", "Court Fees and Other Costs (₹)", "number"],
+      ["settlement_amount", "Settlement Amount if Applicable (₹)", "number"],
     ];
     
     if (eType === "Vehicle Breakdown") return [
       ["vehicle_type", "Vehicle Type (Car/Bike/Commercial)", "text"],
-      ["issue", "Problem (Engine/Accident/Theft)", "text"],
-      ["repair_cost", "Estimated Repair Cost (₹)", "number"],
-      ["insurance_coverage", "Insurance Will Cover (₹)", "number"],
-      ["need_alternate", "Need Alternative Transport? (Yes/No)", "text"],
+      ["problem_type", "Problem (Engine/Accident/Theft/Major Repair)", "text"],
+      ["repair_cost", "Estimated Repair/Replacement Cost (₹)", "number"],
+      ["insurance_coverage", "Insurance Coverage (₹)", "number"],
+      ["need_alternate_transport", "Need Alternative Transport? (Yes/No)", "text"],
+      ["vehicle_age", "Vehicle Age (years)", "number"],
     ];
     
     return [];
@@ -105,6 +204,42 @@ export default function EmergencyAdvisor() {
         <div style={{ width: "380px", display: "flex", flexDirection: "column" }}>
         <div className="card" style={{ padding: "1.5rem", flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           <h3 style={{ fontWeight: 700, marginBottom: "1rem", fontSize: "1.1rem" }}>🆘 Emergency Advisor</h3>
+          
+          {/* User Financial Summary */}
+          {!userData.loading && (
+            <div style={{ 
+              padding: "0.8rem", 
+              background: "rgba(99,102,241,0.1)", 
+              borderRadius: "0.5rem",
+              border: "1px solid rgba(99,102,241,0.3)",
+              marginBottom: "1rem"
+            }}>
+              <div style={{ fontSize: "0.7rem", fontWeight: 600, color: "rgba(255,255,255,0.5)", marginBottom: "0.5rem" }}>
+                YOUR FINANCIAL DATA
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem", fontSize: "0.75rem" }}>
+                <div>
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Income:</span>{" "}
+                  <span style={{ color: "#34d399", fontWeight: 600 }}>₹{userData.income.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Expenses:</span>{" "}
+                  <span style={{ color: "#f59e0b", fontWeight: 600 }}>₹{userData.expenses.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Savings:</span>{" "}
+                  <span style={{ color: "#3b82f6", fontWeight: 600 }}>₹{userData.savings.toLocaleString()}</span>
+                </div>
+                <div>
+                  <span style={{ color: "rgba(255,255,255,0.5)" }}>Assets:</span>{" "}
+                  <span style={{ color: "#a78bfa", fontWeight: 600 }}>{userData.assets.length} items</span>
+                </div>
+              </div>
+              <div style={{ fontSize: "0.65rem", color: "rgba(255,255,255,0.4)", marginTop: "0.5rem" }}>
+                ✓ Auto-loaded from your profile
+              </div>
+            </div>
+          )}
           
           <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "1rem" }}>
             {/* Emergency Type Selection */}
@@ -141,7 +276,7 @@ export default function EmergencyAdvisor() {
               <>
                 <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: "1rem" }}>
                   <label style={{ fontSize: "0.7rem", fontWeight: 600, color: "var(--accent)", display: "block", marginBottom: 12 }}>
-                    PROVIDE DETAILS
+                    EMERGENCY-SPECIFIC DETAILS
                   </label>
                   <div style={{ display: "flex", flexDirection: "column", gap: "0.8rem" }}>
                     {getFields().map(([key, label, type]) => (
@@ -307,10 +442,10 @@ export default function EmergencyAdvisor() {
               )}
 
               {/* Asset Liquidation Guide */}
-              {result.asset_liquidation && (
+              {result.asset_liquidation && result.asset_liquidation.length > 0 && (
                 <div className="card" style={{ padding: "1.2rem" }}>
                   <h4 style={{ fontWeight: 700, marginBottom: "0.8rem", fontSize: "0.95rem", color: "#f59e0b" }}>
-                    🏦 HOW TO SELL ASSETS - Step by Step
+                    🏦 HOW TO SELL YOUR ASSETS - Step by Step
                   </h4>
                   {result.asset_liquidation.map((asset: any, i: number) => (
                     <div key={i} style={{ 
